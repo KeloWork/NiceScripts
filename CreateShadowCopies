@@ -1,0 +1,15 @@
+# Prompt the user to enter the volume and the number of shadow copies
+$volume = Read-Host "Enter the volume (e.g., C:\)"
+$numCopies = Read-Host "Enter the number of shadow copies to create"
+
+# Loop to create the specified number of shadow copies
+for ($i = 1; $i -le $numCopies; $i++) {
+    $shadowCopy = Invoke-CimMethod -Namespace "root\cimv2" -ClassName "Win32_ShadowCopy" -MethodName "Create" -Arguments @{Volume = $volume; Context = "ClientAccessible"}
+
+    # Check if the shadow copy was created successfully
+    if ($shadowCopy.ReturnValue -eq 0) {
+        Write-Output "Shadow copy $i created successfully."
+    } else {
+        Write-Output "Failed to create shadow copy $i. Error code: $($shadowCopy.ReturnValue)"
+    }
+}
