@@ -9,11 +9,35 @@ function Ensure-VSSService {
     }
 }
 
+# Function to re-register VSS components
+function ReRegister-VSSComponents {
+    Write-Output "Re-registering VSS components..."
+    Invoke-Expression -Command {
+        cd /d $env:windir\system32
+        net stop vss
+        net stop swprv
+        regsvr32 /s vssvc.dll
+        regsvr32 /s swprv.dll
+        regsvr32 /s ole32.dll
+        regsvr32 /s oleaut32.dll
+        regsvr32 /s es.dll
+        regsvr32 /s stdprov.dll
+        regsvr32 /s vssui.dll
+        regsvr32 /s msxml.dll
+        regsvr32 /s msxml3.dll
+        regsvr32 /s msxml4.dll
+        vssvc /register
+        net start swprv
+        net start vss
+    }
+    Write-Output "VSS components re-registered."
+}
+
 # Prompt user for volume
 $volume = Read-Host "Enter the volume (e.g., C:)"
 
 # Prompt user for number of shadow copies and ensure it's an integer
-$numCopies = $null
+$numCopies = 0
 while (-not [int]::TryParse((Read-Host "Enter the number of shadow copies to create"), [ref]$numCopies)) {
     Write-Output "Please enter a valid integer for the number of shadow copies."
 }
@@ -24,13 +48,23 @@ Ensure-VSSService
 # Loop to create the specified number of shadow copies
 for ($i = 1; $i -le $numCopies; $i++) {
     try {
-        $result = wmic shadowcopy call create Volume="$volume"
-        if ($result.ReturnValue -eq 0) {
+        $shadowCopy = Get-WmiObject -List Win32_ShadowCopy | ForEach-Object { $_.Create("$volume\", "ClientAccessible") }
+        if ($shadowCopy.ReturnValue -eq 0) {
             Write-Output "Shadow copy $i created successfully."
         } else {
-            Write-Output "Failed to create shadow copy $i. Error code: $($result.ReturnValue)"
+            Write-Output "Failed to create shadow copy $i. Error code: $($shadowCopy.ReturnValue)"
         }
     } catch {
-        Write-Output "Error creating shadow copy $i: $_"
+        Write-Output "Error creating shadow copy $i $_"
+        if ($_.Exception.Message -like "*Initialization failure*") {
+            ReRegister-VSSComponents
+            # Retry creating shadow copy after re-registering VSS components
+            $shadowCopy = Get-WmiObject -List Win32_ShadowCopy | ForEach-Object { $_.Create("$volume\", "ClientAccessible") }
+            if ($shadowCopy.ReturnValue -eq 0) {
+                Write-Output "Shadow copy $i created successfully after re-registering VSS components."
+            } else {
+                Write-Output "Failed to create shadow copy $i after re-registering VSS components. Error code: $($shadowCopy.ReturnValue)"
+            }
+        }
     }
 }
