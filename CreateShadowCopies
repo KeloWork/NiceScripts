@@ -9,9 +9,14 @@ function Ensure-VSSService {
     }
 }
 
-# Prompt user for volume and number of shadow copies
+# Prompt user for volume
 $volume = Read-Host "Enter the volume (e.g., C:)"
-$numCopies = int
+
+# Prompt user for number of shadow copies and ensure it's an integer
+$numCopies = $null
+while (-not [int]::TryParse((Read-Host "Enter the number of shadow copies to create"), [ref]$numCopies)) {
+    Write-Output "Please enter a valid integer for the number of shadow copies."
+}
 
 # Ensure VSS service is running
 Ensure-VSSService
