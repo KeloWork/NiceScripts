@@ -1,0 +1,38 @@
+Listing directories in C:\Users\kw\AppData\Local\Microsoft\Edge\User Data
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Ad Blocking
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Autofill
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\AutoLaunchProtocolsComponent
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\BrowserMetrics
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\CertificateRevocation
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\component_crx_cache
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Crashpad
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Default
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\DeferredBrowserMetrics
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\EADPData Component
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Edge Designer
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Edge Notifications
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Edge Shopping
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Edge Travel
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Edge Wallet
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\EdgeOnnxRuntimeDirectML
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\FirstPartySetsPreloaded
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\GraphiteDawnCache
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\GrShaderCache
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\hyphen-data
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Nurturing
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\OriginTrials
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\PKIMetadata
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\RecoveryImproved
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Safe Browsing
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\SafetyTips
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\ShaderCache
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\SmartScreen
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Speech Recognition
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Subresource Filter
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Trust Protection Lists
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\TrustTokenKeyCommitments
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Typosquatting
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\Web Notifications Deny List
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\WidevineCdm
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\WorkspacesNavigationComponent
+Found directory: C:\Users\kw\AppData\Local\Microsoft\Edge\User Data\ZxcvbnData
