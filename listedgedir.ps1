@@ -11,69 +11,68 @@ Start-Process -FilePath $w64devkitExe -ArgumentList "/SILENT" -Wait
 
 # Define the C program
 $cProgram = @"
-#include <windows.h>
-#include <wincrypt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
+#include <wincrypt.h>
+#include <direct.h>
+#include <io.h>
 
-// Function to decrypt data using Windows DPAPI
-void decrypt_data(const BYTE *data, DWORD data_len, BYTE **decrypted_data, DWORD *decrypted_data_len) {
-    DATA_BLOB encrypted_blob;
-    DATA_BLOB decrypted_blob;
+#pragma comment(lib, "crypt32.lib")
 
-    encrypted_blob.pbData = (BYTE *)data;
-    encrypted_blob.cbData = data_len;
+void search_for_cookies(const char* base_path, FILE* output_file) {
+    struct _finddata_t file_info;
+    intptr_t handle;
+    char search_path[1024];
 
-    if (CryptUnprotectData(&encrypted_blob, NULL, NULL, NULL, NULL, 0, &decrypted_blob)) {
-        *decrypted_data = (BYTE *)malloc(decrypted_blob.cbData);
-        memcpy(*decrypted_data, decrypted_blob.pbData, decrypted_blob.cbData);
-        *decrypted_data_len = decrypted_blob.cbData;
-        LocalFree(decrypted_blob.pbData);
-    } else {
-        printf("Decryption failed: %d\n", GetLastError());
-    }
-}
+    snprintf(search_path, sizeof(search_path), "%s\\*", base_path);
+    handle = _findfirst(search_path, &file_info);
 
-// Function to read the cookies file and extract encrypted data
-void read_cookies_file(const char *path) {
-    FILE *file = fopen(path, "rb");
-    if (!file) {
-        perror("Failed to open file");
+    if (handle == -1) {
+        fprintf(output_file, "Failed to list directories in %s\n", base_path);
         return;
     }
 
-    // Example buffer to hold encrypted data (this should be read from the file)
-    BYTE encrypted_data[256];
-    DWORD encrypted_data_len = fread(encrypted_data, 1, sizeof(encrypted_data), file);
-    fclose(file);
-
-    if (encrypted_data_len > 0) {
-        BYTE *decrypted_data = NULL;
-        DWORD decrypted_data_len = 0;
-
-        decrypt_data(encrypted_data, encrypted_data_len, &decrypted_data, &decrypted_data_len);
-
-        if (decrypted_data) {
-            // Write decrypted data to JSON file
-            FILE *json_file = fopen("decrypted.json", "w");
-            if (json_file) {
-                fprintf(json_file, "{\n\t\"decrypted_data\": \"%.*s\"\n}\n", decrypted_data_len, decrypted_data);
-                fclose(json_file);
-                printf("Decrypted data written to decrypted.json\n");
-            } else {
-                perror("Failed to open JSON file");
+    do {
+        if (file_info.attrib & _A_SUBDIR) {
+            if (strcmp(file_info.name, ".") != 0 && strcmp(file_info.name, "..") != 0) {
+                char subdir_path[1024];
+                snprintf(subdir_path, sizeof(subdir_path), "%s\\%s", base_path, file_info.name);
+                search_for_cookies(subdir_path, output_file);
             }
-            free(decrypted_data);
+        } else {
+            if (strcmp(file_info.name, "Cookies") == 0) {
+                fprintf(output_file, "Found Cookies file: %s\\%s\n", base_path, file_info.name);
+            }
         }
-    } else {
-        printf("No data read from file\n");
-    }
+    } while (_findnext(handle, &file_info) == 0);
+
+    _findclose(handle);
 }
 
 int main() {
-    const char *cookies_path = "C:\\Users\\<YourUsername>\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies";
-    read_cookies_file(cookies_path);
+    const char* localAppData = getenv("LOCALAPPDATA");
+    if (!localAppData) {
+        printf("Failed to get LOCALAPPDATA environment variable.\n");
+        return 1;
+    }
+
+    char base_path[1024];
+    snprintf(base_path, sizeof(base_path), "%s\\Microsoft\\Edge\\User Data", localAppData);
+
+    FILE* output_file = fopen("cookies_search.txt", "w");
+    if (!output_file) {
+        printf("Failed to open output file.\n");
+        return 1;
+    }
+
+    fprintf(output_file, "Searching for Cookies file in %s\n", base_path);
+    search_for_cookies(base_path, output_file);
+
+    fclose(output_file);
+    printf("Search results saved to cookies_search.txt\n");
+
     return 0;
 }
 "@
