@@ -30,6 +30,17 @@ void print_hex(const BYTE *data, DWORD data_len) {
     printf("\n");
 }
 
+// Function to convert hex string to binary data
+void hex_to_bin(const char *hex_str, BYTE **bin_data, DWORD *bin_len) {
+    size_t hex_len = strlen(hex_str);
+    *bin_len = hex_len / 2;
+    *bin_data = (BYTE *)malloc(*bin_len);
+
+    for (size_t i = 0; i < *bin_len; i++) {
+        sscanf(hex_str + 2 * i, "%2hhx", &(*bin_data)[i]);
+    }
+}
+
 // Function to decrypt data using Windows DPAPI
 void decrypt_data(const BYTE *data, DWORD data_len, BYTE **decrypted_data, DWORD *decrypted_data_len) {
     DATA_BLOB encrypted_blob;
