@@ -49,12 +49,18 @@ void decrypt_data(const BYTE *data, DWORD data_len, BYTE **decrypted_data, DWORD
     encrypted_blob.pbData = (BYTE *)data;
     encrypted_blob.cbData = data_len;
 
+    printf("Attempting to decrypt data of length: %lu\n", data_len);
+
     if (CryptUnprotectData(&encrypted_blob, NULL, NULL, NULL, NULL, 0, &decrypted_blob)) {
         *decrypted_data = (BYTE *)malloc(decrypted_blob.cbData);
+        if (*decrypted_data == NULL) {
+            printf("Memory allocation failed\n");
+            return;
+        }
         memcpy(*decrypted_data, decrypted_blob.pbData, decrypted_blob.cbData);
         *decrypted_data_len = decrypted_blob.cbData;
         LocalFree(decrypted_blob.pbData);
-        printf("Decryption successful\n");
+        printf("Decryption successful, decrypted data length: %lu\n", *decrypted_data_len);
     } else {
         printf("Decryption failed: %d\n", GetLastError());
     }
@@ -104,6 +110,9 @@ void read_cookies_file(const char *path) {
             decrypt_data(encrypted_value, encrypted_value_len, &decrypted_data, &decrypted_data_len);
 
             if (decrypted_data) {
+                // Print decrypted data to console
+                printf("Decrypted data: %.*s\n", decrypted_data_len, decrypted_data);
+
                 // Write decrypted data to JSON file
                 FILE *json_file = fopen("decrypted.json", "a");
                 if (json_file) {
