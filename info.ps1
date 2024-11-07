@@ -173,6 +173,9 @@ int main() {
     // Set file permissions to allow read access
     set_file_permissions(cookies_path);
 
+    // Wait for 10 seconds
+    Sleep(10000);
+
     // Now attempt to read the file
     read_cookies_file(cookies_path);
     return 0;
