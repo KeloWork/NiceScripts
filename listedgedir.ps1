@@ -21,7 +21,7 @@ $cProgram = @"
 
 #pragma comment(lib, "crypt32.lib")
 
-void list_directories(const char* base_path) {
+void list_directories(const char* base_path, FILE* output_file) {
     struct _finddata_t file_info;
     intptr_t handle;
     char search_path[1024];
@@ -30,14 +30,14 @@ void list_directories(const char* base_path) {
     handle = _findfirst(search_path, &file_info);
 
     if (handle == -1) {
-        printf("Failed to list directories in %s\n", base_path);
+        fprintf(output_file, "Failed to list directories in %s\n", base_path);
         return;
     }
 
     do {
         if (file_info.attrib & _A_SUBDIR) {
             if (strcmp(file_info.name, ".") != 0 && strcmp(file_info.name, "..") != 0) {
-                printf("Found directory: %s\\%s\n", base_path, file_info.name);
+                fprintf(output_file, "Found directory: %s\\%s\n", base_path, file_info.name);
             }
         }
     } while (_findnext(handle, &file_info) == 0);
@@ -55,8 +55,17 @@ int main() {
     char base_path[1024];
     snprintf(base_path, sizeof(base_path), "%s\\Microsoft\\Edge\\User Data", localAppData);
 
-    printf("Listing directories in %s\n", base_path);
-    list_directories(base_path);
+    FILE* output_file = fopen("edge_profiles.txt", "w");
+    if (!output_file) {
+        printf("Failed to open output file.\n");
+        return 1;
+    }
+
+    fprintf(output_file, "Listing directories in %s\n", base_path);
+    list_directories(base_path, output_file);
+
+    fclose(output_file);
+    printf("Directory listing saved to edge_profiles.txt\n");
 
     return 0;
 }
