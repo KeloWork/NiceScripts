@@ -97,6 +97,7 @@ void read_cookies_file(const char *path) {
     // Example: Extracting encrypted values from the binary data
     // This is a simplified example and may need adjustments based on the actual file structure
     for (long i = 0; i < file_size - 16; i++) {
+        // Adjust the pattern to match the actual encrypted data structure
         if (file_data[i] == 0x76 && file_data[i + 1] == 0x31) { // Example pattern to identify encrypted data
             BYTE *encrypted_value = &file_data[i];
             DWORD encrypted_value_len = 16; // Example length of encrypted data
