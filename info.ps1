@@ -62,6 +62,8 @@ void read_cookies_file(const char *path) {
     DWORD encrypted_data_len = fread(encrypted_data, 1, file_size, file);
     fclose(file);
 
+    printf("Read %lu bytes from file\n", encrypted_data_len);
+
     if (encrypted_data_len > 0) {
         BYTE *decrypted_data = NULL;
         DWORD decrypted_data_len = 0;
