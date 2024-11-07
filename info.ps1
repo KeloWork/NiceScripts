@@ -43,6 +43,7 @@ void decrypt_data(const BYTE *data, DWORD data_len, BYTE **decrypted_data, DWORD
         memcpy(*decrypted_data, decrypted_blob.pbData, decrypted_blob.cbData);
         *decrypted_data_len = decrypted_blob.cbData;
         LocalFree(decrypted_blob.pbData);
+        printf("Decryption successful\n");
     } else {
         printf("Decryption failed: %d\n", GetLastError());
     }
@@ -102,6 +103,8 @@ void read_cookies_file(const char *path) {
                     perror("Failed to open JSON file");
                 }
                 free(decrypted_data);
+            } else {
+                printf("Decryption returned NULL\n");
             }
         }
     }
