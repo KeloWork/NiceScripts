@@ -45,9 +45,21 @@ void read_cookies_file(const char *path) {
         return;
     }
 
-    // Example buffer to hold encrypted data (this should be read from the file)
-    BYTE encrypted_data[256];
-    DWORD encrypted_data_len = fread(encrypted_data, 1, sizeof(encrypted_data), file);
+    // Determine the file size
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    // Allocate buffer to hold the entire file content
+    BYTE *encrypted_data = (BYTE *)malloc(file_size);
+    if (!encrypted_data) {
+        perror("Failed to allocate memory");
+        fclose(file);
+        return;
+    }
+
+    // Read the entire file content
+    DWORD encrypted_data_len = fread(encrypted_data, 1, file_size, file);
     fclose(file);
 
     if (encrypted_data_len > 0) {
@@ -71,6 +83,8 @@ void read_cookies_file(const char *path) {
     } else {
         printf("No data read from file\n");
     }
+
+    free(encrypted_data);
 }
 
 // Function to set file permissions to allow read access
