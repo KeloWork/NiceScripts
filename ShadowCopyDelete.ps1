@@ -47,23 +47,14 @@ switch ($choice) {
     2 { Delete-ShadowCopiesWmic }
     3 { Delete-ShadowCopiesPowerShell }
     4 { $driveLetter = Read-Host "Enter Drive Letter (e.g C:)"
-        $netSize = Read-Host "Enter new storage size (e.g 300MB)"
-        $currentShadowStorage = Get-WmiObject -Class Win32_ShadowStorage WHERE Win32_Volume = '$driveLetter'
+        $newSize = Read-Host "Enter new storage size (e.g 300MB)"
+        $currentShadowStorage = Get-WmiObject -Class Win32_ShadowStorage -Filter "Volume='\\\\?\\Volume{$driveLetter}\\'"
         if ($currentShadowStorage) {
-        Resize-ShadowStorage -ForVolume $driveLetter -OnVolume -$driveLetter -MaxSize $newSize
+            Resize-ShadowStorage -ForVolume $driveLetter -OnVolume $driveLetter -MaxSize $newSize
         } else {
-        Write-Host "No shadow storage found for drive" }
-        Resize-ShadowStorage 
+            Write-Host "No shadow storage found for drive $driveLetter"
+        }
       }
     5 { Delete-ShadowCopiesCOM }
     default { Write-Host "Invalid choice. Please run the script again and choose a valid option." }
 }
-
-Get-WmiObject : A positional parameter cannot be found that accepts argument 'Win32_Volume'.
-At C:\Share\shadow_delete.ps1:51 char:33
-+ ... owStorage = Get-WmiObject -Class Win32_ShadowStorage WHERE Win32_Volu ...
-+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidArgument: (:) [Get-WmiObject], ParameterBindingException
-    + FullyQualifiedErrorId : PositionalParameterNotFound,Microsoft.PowerShell.Commands.GetWmiOb 
-   jectCommand
-
