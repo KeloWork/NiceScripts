@@ -13,36 +13,9 @@ function Delete-ShadowCopiesPowerShell {
     Get-WmiObject Win32_ShadowCopy | Remove-WmiObject
 }
 
-# Function to resize shadow storage
+# Function to resize shadow storage to delete shadow copies
 function Resize-ShadowStorage {
-    param (
-        [string]$ForVolume,
-        [string]$OnVolume,
-        [string]$MaxSize
-    )
-    $command = "vssadmin resize shadowstorage /for=$ForVolume /on=$OnVolume /maxsize=$MaxSize"
-    Invoke-Expression $command
-}
-
-# Prompt the user for the drive letter and new shadow storage size
-$driveLetter = Read-Host "Enter the drive letter (e.g., C:)"
-$newSize = Read-Host "Enter the new shadow storage size (e.g., 300MB)"
-
-# Get the current shadow storage settings
-$currentShadowStorage = Get-WmiObject -Query "SELECT * FROM Win32_ShadowStorage WHERE Volume = '$driveLetter'"
-
-# Check if shadow storage exists for the specified drive
-if ($currentShadowStorage) {
-    # Resize the shadow storage to a smaller size to delete existing shadow copies
-    Resize-ShadowStorage -ForVolume $driveLetter -OnVolume $driveLetter -MaxSize $newSize
-
-    # Optionally, resize back to the original size or a desired size
-    $desiredSize = Read-Host "Enter the desired shadow storage size after deletion (e.g., 10GB)"
-    Resize-ShadowStorage -ForVolume $driveLetter -OnVolume $driveLetter -MaxSize $desiredSize
-
-    Write-Host "Shadow copies deleted and shadow storage resized successfully."
-} else {
-    Write-Host "No shadow storage found for the specified drive."
+    vssadmin resize shadowstorage /for=C: /on=C: /maxsize=300MB
 }
 
 # Function to delete shadow copies using COM object manipulation
@@ -73,7 +46,24 @@ switch ($choice) {
     1 { Delete-ShadowCopiesVssadmin }
     2 { Delete-ShadowCopiesWmic }
     3 { Delete-ShadowCopiesPowerShell }
-    4 { Resize-ShadowStorage }
+    4 { $driveLetter = Read-Host "Enter Drive Letter (e.g C:)"
+        $netSize = Read-Host "Enter new storage size (e.g 300MB)"
+        $currentShadowStorage = Get-WmiObject -Class Win32_ShadowStorage WHERE Win32_Volume = '$driveLetter'
+        if ($currentShadowStorage) {
+        Resize-ShadowStorage -ForVolume $driveLetter -OnVolume -$driveLetter -MaxSize $newSize
+        } else {
+        Write-Host "No shadow storage found for drive" }
+        Resize-ShadowStorage 
+      }
     5 { Delete-ShadowCopiesCOM }
     default { Write-Host "Invalid choice. Please run the script again and choose a valid option." }
 }
+
+Get-WmiObject : A positional parameter cannot be found that accepts argument 'Win32_Volume'.
+At C:\Share\shadow_delete.ps1:51 char:33
++ ... owStorage = Get-WmiObject -Class Win32_ShadowStorage WHERE Win32_Volu ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Get-WmiObject], ParameterBindingException
+    + FullyQualifiedErrorId : PositionalParameterNotFound,Microsoft.PowerShell.Commands.GetWmiOb 
+   jectCommand
+
