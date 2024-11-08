@@ -58,3 +58,13 @@ switch ($choice) {
     5 { Delete-ShadowCopiesCOM }
     default { Write-Host "Invalid choice. Please run the script again and choose a valid option." }
 }
+
+
+Get-WmiObject : Invalid query "select * from Win32_ShadowStorage where 
+Volume='\\\\?\\Volume{C:}\\'"
+At C:\Share\shadow_delete.ps1:51 char:33
++ ... owStorage = Get-WmiObject -Class Win32_ShadowStorage -Filter "Volume= ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Get-WmiObject], ManagementException
+    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.Commands.GetWmiObje 
+   ctCommand
