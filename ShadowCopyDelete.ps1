@@ -40,6 +40,16 @@ function Show-Menu {
     return $choice
 }
 
+# Function to normalize drive letter input
+function Normalize-DriveLetter {
+    param (
+        [string]$driveLetter
+    )
+    # Remove any trailing backslashes or colons
+    $normalizedDriveLetter = $driveLetter.TrimEnd('\', ':')
+    return "$normalizedDriveLetter:"
+}
+
 # Main script
 $choice = Show-Menu
 switch ($choice) {
@@ -47,24 +57,16 @@ switch ($choice) {
     2 { Delete-ShadowCopiesWmic }
     3 { Delete-ShadowCopiesPowerShell }
     4 { $driveLetter = Read-Host "Enter Drive Letter (e.g C:)"
+        $normalizedDriveLetter = Normalize-DriveLetter -driveLetter $driveLetter
         $newSize = Read-Host "Enter new storage size (e.g 300MB)"
-        $currentShadowStorage = Get-WmiObject -Class Win32_ShadowStorage -Filter "Volume='\\\\?\\Volume{$driveLetter}\\'"
+        $filter = "Volume='$normalizedDriveLetter\\'"
+        $currentShadowStorage = Get-WmiObject -Class Win32_ShadowStorage -Filter $filter
         if ($currentShadowStorage) {
-            Resize-ShadowStorage -ForVolume $driveLetter -OnVolume $driveLetter -MaxSize $newSize
+            Resize-ShadowStorage -ForVolume $normalizedDriveLetter -OnVolume $normalizedDriveLetter -MaxSize $newSize
         } else {
-            Write-Host "No shadow storage found for drive $driveLetter"
+            Write-Host "No shadow storage found for drive $normalizedDriveLetter"
         }
       }
     5 { Delete-ShadowCopiesCOM }
     default { Write-Host "Invalid choice. Please run the script again and choose a valid option." }
 }
-
-
-Get-WmiObject : Invalid query "select * from Win32_ShadowStorage where 
-Volume='\\\\?\\Volume{C:}\\'"
-At C:\Share\shadow_delete.ps1:51 char:33
-+ ... owStorage = Get-WmiObject -Class Win32_ShadowStorage -Filter "Volume= ...
-+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidArgument: (:) [Get-WmiObject], ManagementException
-    + FullyQualifiedErrorId : GetWMIManagementException,Microsoft.PowerShell.Commands.GetWmiObje 
-   ctCommand
