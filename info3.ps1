@@ -1,4 +1,4 @@
-﻿# Define the URLs for the downloads
+# Define the URLs for the downloads
 $sqliteUrl = "https://github.com/sqlite/sqlite/archive/refs/heads/master.zip"
 $smallerCUrl = "https://github.com/alexfru/SmallerC/archive/refs/heads/master.zip"
 $zipFilePath = "$env:TEMP\sqlite.zip"
@@ -37,11 +37,6 @@ Expand-Archive -Path $smallerCZipPath -DestinationPath $smallerCExtractPath
 
 # Clean up SmallerC ZIP file
 Remove-Item -Path $smallerCZipPath
-
-# Build SQLite from source
-Write-Output "Building SQLite from source..."
-cd "$sqliteExtractPath\sqlite-master"
-gcc -o sqlite3.exe shell.c sqlite3.c
 
 # Define the C code
 $cCode = @'
