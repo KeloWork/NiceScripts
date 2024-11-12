@@ -1,49 +1,22 @@
-# Define the URLs for the downloads
-$sqliteUrl = "https://github.com/sqlite/sqlite/archive/refs/heads/master.zip"
-$tccUrl = "https://github.com/cnlohr/tinycc-win64-installer/releases/download/v0_0.9.27/tcc-0.9.27-win64-installer.exe"
-$zipFilePath = "$env:TEMP\sqlite.zip"
-$tccInstallerPath = "$env:TEMP\tcc-installer.exe"
-$sqliteExtractPath = "$env:ProgramFiles\SQLite"
-$tccInstallPath = "$env:ProgramFiles\TinyCC"
+# Define the URL for the SQLite amalgamation ZIP file
+$headerUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip"
+$headerZipPath = "$env:TEMP\sqlite-amalgamation.zip"
+$tccIncludePath = "C:\Program Files (x86)\tcc-0.9.27\include"
 
-# Download the SQLite source ZIP file
-Write-Output "Downloading SQLite source..."
-Invoke-WebRequest -Uri $sqliteUrl -OutFile $zipFilePath
+# Download the SQLite amalgamation ZIP file
+Write-Output "Downloading SQLite amalgamation..."
+Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
 
-# Create the extraction directory if it doesn't exist
-if (-Not (Test-Path -Path $sqliteExtractPath)) {
-    New-Item -ItemType Directory -Path $sqliteExtractPath
-}
+# Extract the SQLite amalgamation ZIP file
+Write-Output "Extracting SQLite amalgamation..."
+Expand-Archive -Path $headerZipPath -DestinationPath $env:TEMP -Force
 
-# Extract the SQLite ZIP file
-Write-Output "Extracting SQLite source..."
-Expand-Archive -Path $zipFilePath -DestinationPath $sqliteExtractPath -Force
+# Copy sqlite3.h to TCC include directory
+Write-Output "Copying sqlite3.h to TCC include directory..."
+Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.h" -Destination $tccIncludePath
 
-# Clean up SQLite ZIP file
-Remove-Item -Path $zipFilePath
-
-# Download the TCC installer
-Write-Output "Downloading TCC installer..."
-Invoke-WebRequest -Uri $tccUrl -OutFile $tccInstallerPath
-
-# Run the TCC installer
-Write-Output "Running TCC installer..."
-Start-Process -FilePath $tccInstallerPath -ArgumentList "/SILENT", "/DIR=$tccInstallPath" -Wait
-
-# Clean up TCC installer
-Remove-Item -Path $tccInstallerPath
-
-# Add TCC and SQLite to the system PATH
-Write-Output "Adding TCC and SQLite to the system PATH..."
-$tccBinPath = "$tccInstallPath"
-$sqliteBinPath = "$sqliteExtractPath\sqlite-master"
-$envPath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
-if (-Not $envPath.Contains($tccBinPath)) {
-    [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$tccBinPath", [System.EnvironmentVariableTarget]::Machine)
-}
-if (-Not $envPath.Contains($sqliteBinPath)) {
-    [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$sqliteBinPath", [System.EnvironmentVariableTarget]::Machine)
-}
+# Clean up SQLite amalgamation ZIP file
+Remove-Item -Path $headerZipPath
 
 # Define the C code
 $cCode = @'
