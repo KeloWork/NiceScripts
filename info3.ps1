@@ -25,6 +25,9 @@ $cCode = @'
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <shlobj.h> // Include this header for SHGetFolderPathA and CSIDL_APPDATA
+
+#define _WIN32_WINNT 0x0500 // Define this to use SHGetFolderPathA
 
 void decrypt(char *str) {
     while (*str) {
