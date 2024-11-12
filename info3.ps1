@@ -157,13 +157,7 @@ Set-Content -Path $cFilePath -Value $cCode
 
 # Compile the C code using TCC
 Write-Output "Compiling the C code..."
-$tccBinPath = "$tccInstallPath"
-$envPath = [System.Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
-if (-Not $envPath.Contains($tccBinPath)) {
-    [System.Environment]::SetEnvironmentVariable("Path", "$envPath;$tccBinPath", [System.EnvironmentVariableTarget]::Machine)
-}
-cd $tccBinPath
-tcc.exe -o "$env:TEMP\read_browser_data.exe" $cFilePath
+tcc -o "$env:TEMP\read_browser_data.exe" $cFilePath
 
 Write-Output "Compilation completed successfully!"
 
@@ -171,4 +165,4 @@ Write-Output "Compilation completed successfully!"
 Write-Output "Executing the compiled program..."
 & "$env:TEMP\read_browser_data.exe"
 
-Write-Output "Executing..."
+Write-Output "Execution completed. Check output.csv for results."
