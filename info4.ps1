@@ -48,6 +48,10 @@ char* decrypt_password(const void *enc_data, int enc_data_len) {
     }
     printf("\n");
 
+    // Verify parameters before calling CryptUnprotectData
+    printf("in_blob.pbData: %p\n", in_blob.pbData);
+    printf("in_blob.cbData: %d\n", in_blob.cbData);
+
     if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, 0, &out_blob)) {
         char *dec_data = (char *)malloc(out_blob.cbData + 1);
         if (dec_data == NULL) {
