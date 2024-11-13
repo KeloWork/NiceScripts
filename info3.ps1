@@ -1,8 +1,7 @@
 # Define the URL for the SQLite amalgamation ZIP file
 $headerUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip"
 $headerZipPath = "$env:TEMP\sqlite-amalgamation.zip"
-$gccIncludePath = "C:\MinGW\include"
-$gccLibPath = "C:\MinGW\lib"
+$w64devkitPath = "$env:TEMP\w64devkit"
 
 # Define the C code
 $cCode = @"
@@ -133,18 +132,22 @@ int main() {
 }
 "@
 
-# Download and install MinGW-w64
-$mingwInstallerUrl = "https://sourceforge.net/projects/mingw-w64/files/latest/download"
-$mingwInstallerPath = "$env:TEMP\mingw-w64-install.exe"
+# Download and extract w64devkit
+$w64devkitUrl = "https://github.com/skeeto/w64devkit/releases/download/v2.0.0/w64devkit-x86_64.zip"
+$w64devkitZipPath = "$env:TEMP\w64devkit.zip"
 
-Write-Output "Downloading MinGW-w64 installer..."
-Invoke-WebRequest -Uri $mingwInstallerUrl -OutFile $mingwInstallerPath
+Write-Output "Downloading w64devkit..."
+Invoke-WebRequest -Uri $w64devkitUrl -OutFile $w64devkitZipPath
 
-Write-Output "Installing MinGW-w64..."
-Start-Process -FilePath $mingwInstallerPath -ArgumentList "/silent" -Wait
+Write-Output "Extracting w64devkit..."
+Expand-Archive -Path $w64devkitZipPath -DestinationPath $w64devkitPath -Force
 
-# Add MinGW to the system PATH
-$env:Path += ";C:\Program Files\mingw-w64\bin"
+# Add w64devkit to the system PATH
+$env:Path += ";$w64devkitPath\bin"
+
+# Restart the shell to apply the new PATH
+Write-Output "Restarting shell to apply new PATH..."
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location -Path $pwd"
 
 # Download the SQLite amalgamation ZIP file
 Write-Output "Downloading SQLite amalgamation..."
@@ -154,21 +157,22 @@ Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
 Write-Output "Extracting SQLite amalgamation..."
 Expand-Archive -Path $headerZipPath -DestinationPath $env:TEMP -Force
 
-# Copy sqlite3.h and sqlite3.c to the MinGW include directory
-Write-Output "Copying sqlite3.h and sqlite3.c to MinGW include directory..."
-Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.h" -Destination $gccIncludePath
-Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.c" -Destination $gccIncludePath
+# Copy sqlite3.h and sqlite3.c to the w64devkit include directory
+Write-Output "Copying sqlite3.h and sqlite3.c to w64devkit include directory..."
+Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.h" -Destination "$w64devkitPath\include"
+Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.c" -Destination "$w64devkitPath\include"
 
-# Clean up SQLite amalgamation ZIP file
+# Clean up downloaded files
 Remove-Item -Path $headerZipPath
+Remove-Item -Path $w64devkitZipPath
 
 # Write the C code to a file
 $cFilePath = "$env:TEMP\read_browser_data.c"
 Set-Content -Path $cFilePath -Value $cCode
 
-# Compile the C code using GCC
+# Compile the C code using w64devkit GCC
 Write-Output "Compiling the C code..."
-gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath "$gccIncludePath\sqlite3.c" -IC:\MinGW\include -LC:\MinGW\lib -lShell32
+gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32
 
 Write-Output "Compilation completed successfully!"
 
