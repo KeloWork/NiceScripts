@@ -50,9 +50,13 @@ char* decrypt_password(const void *enc_data, int enc_data_len) {
     } else {
         DWORD error = GetLastError();
         fprintf(stderr, "Failed to decrypt password. Error code: %lu\n", error);
+        if (error == ERROR_INVALID_PARAMETER) {
+            fprintf(stderr, "Invalid parameter passed to CryptUnprotectData\n");
+        }
         return NULL;
     }
 }
+
 
 void read_cookies(sqlite3 *db, FILE *file) {
     sqlite3_stmt *res;
