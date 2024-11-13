@@ -132,52 +132,18 @@ int main() {
 }
 "@
 
-# Download and extract w64devkit
-$w64devkitUrl = "https://github.com/skeeto/w64devkit/releases/download/v2.0.0/w64devkit-x86_64.zip"
-$w64devkitZipPath = "$env:TEMP\w64devkit.zip"
+# Download and install w64devkit
+$w64devkitInstallerUrl = "https://github.com/skeeto/w64devkit/releases/download/v2.0.0/w64devkit-x86_64.exe"
+$w64devkitInstallerPath = "$env:TEMP\w64devkit-x86_64.exe"
 
-Write-Output "Downloading w64devkit..."
-Invoke-WebRequest -Uri $w64devkitUrl -OutFile $w64devkitZipPath
+Write-Output "Downloading w64devkit installer..."
+Invoke-WebRequest -Uri $w64devkitInstallerUrl -OutFile $w64devkitInstallerPath
 
-Write-Output "Extracting w64devkit..."
-Expand-Archive -Path $w64devkitZipPath -DestinationPath $w64devkitPath -Force
+Write-Output "Installing w64devkit..."
+Start-Process -FilePath $w64devkitInstallerPath -ArgumentList "/SILENT" -Wait
 
 # Add w64devkit to the system PATH
 $env:Path += ";$w64devkitPath\bin"
 
 # Restart the shell to apply the new PATH
-Write-Output "Restarting shell to apply new PATH..."
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location -Path $pwd"
-
-# Download the SQLite amalgamation ZIP file
-Write-Output "Downloading SQLite amalgamation..."
-Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
-
-# Extract the SQLite amalgamation ZIP file
-Write-Output "Extracting SQLite amalgamation..."
-Expand-Archive -Path $headerZipPath -DestinationPath $env:TEMP -Force
-
-# Copy sqlite3.h and sqlite3.c to the w64devkit include directory
-Write-Output "Copying sqlite3.h and sqlite3.c to w64devkit include directory..."
-Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.h" -Destination "$w64devkitPath\include"
-Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.c" -Destination "$w64devkitPath\include"
-
-# Clean up downloaded files
-Remove-Item -Path $headerZipPath
-Remove-Item -Path $w64devkitZipPath
-
-# Write the C code to a file
-$cFilePath = "$env:TEMP\read_browser_data.c"
-Set-Content -Path $cFilePath -Value $cCode
-
-# Compile the C code using w64devkit GCC
-Write-Output "Compiling the C code..."
-gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32
-
-Write-Output "Compilation completed successfully!"
-
-# Execute the compiled executable
-Write-Output "Executing the compiled program..."
-& "$env:TEMP\read_browser_data.exe"
-
-Write-Output "Execution completed. Check output.csv for results."
+Write-Output "Please restart your PowerShell session to apply the new PATH."
