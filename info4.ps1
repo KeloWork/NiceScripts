@@ -1,7 +1,7 @@
 # Define the URL for the SQLite amalgamation ZIP file
 $headerUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip"
 $headerZipPath = "$env:TEMP\sqlite-amalgamation.zip"
-$w64devkitPath = "$env:TEMP\w64devkit"
+$w64devkitPath = "C:\C"
 
 # Define the C code
 $cCode = @"
@@ -154,7 +154,7 @@ Set-Content -Path $cFilePath -Value $cCode
 
 # Compile the C code using w64devkit GCC
 Write-Output "Compiling the C code..."
-gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32
+& "$w64devkitPath\bin\gcc.exe" -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32
 
 Write-Output "Compilation completed successfully!"
 
