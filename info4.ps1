@@ -24,6 +24,10 @@ void decrypt(char *str) {
 }
 
 void write_to_csv(FILE *file, const char *type, const char *col1, const char *col2, const char *col3) {
+    if (file == NULL) {
+        fprintf(stderr, "File pointer is NULL\n");
+        return;
+    }
     fprintf(file, "%s,%s,%s,%s\n", type, col1, col2, col3);
     printf("Writing to CSV: %s, %s, %s, %s\n", type, col1, col2, col3);
 }
@@ -35,12 +39,17 @@ char* decrypt_password(const void *enc_data, int enc_data_len) {
 
     if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, 0, &out_blob)) {
         char *dec_data = (char *)malloc(out_blob.cbData + 1);
+        if (dec_data == NULL) {
+            fprintf(stderr, "Memory allocation failed\n");
+            return NULL;
+        }
         memcpy(dec_data, out_blob.pbData, out_blob.cbData);
         dec_data[out_blob.cbData] = '\0';
         LocalFree(out_blob.pbData);
         return dec_data;
     } else {
-        fprintf(stderr, "Failed to decrypt password\n");
+        DWORD error = GetLastError();
+        fprintf(stderr, "Failed to decrypt password. Error code: %lu\n", error);
         return NULL;
     }
 }
