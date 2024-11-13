@@ -133,19 +133,34 @@ int main() {
 }
 "@
 
-# Download and install MinGW
-$mingwInstallerUrl = "https://osdn.net/frs/redir.php?m=constant&f=mingw%2F68260%2Fmingw-get-setup.exe"
-$mingwInstallerPath = "$env:TEMP\mingw-get-setup.exe"
+# Download and install MinGW-w64
+$mingwInstallerUrl = "https://sourceforge.net/projects/mingw-w64/files/latest/download"
+$mingwInstallerPath = "$env:TEMP\mingw-w64-install.exe"
 
-Write-Output "Downloading MinGW installer..."
+Write-Output "Downloading MinGW-w64 installer..."
 Invoke-WebRequest -Uri $mingwInstallerUrl -OutFile $mingwInstallerPath
 
-Write-Output "Installing MinGW..."
+Write-Output "Installing MinGW-w64..."
 Start-Process -FilePath $mingwInstallerPath -ArgumentList "/silent" -Wait
 
-# Install necessary MinGW packages
-Write-Output "Installing MinGW packages..."
-& "C:\MinGW\bin\mingw-get.exe" install mingw32-gcc-objc mingw32-gcc-g++ -quiet
+# Add MinGW to the system PATH
+$env:Path += ";C:\Program Files\mingw-w64\bin"
+
+# Download the SQLite amalgamation ZIP file
+Write-Output "Downloading SQLite amalgamation..."
+Invoke-WebRequest -Uri $headerUrl -OutFile $headerZipPath
+
+# Extract the SQLite amalgamation ZIP file
+Write-Output "Extracting SQLite amalgamation..."
+Expand-Archive -Path $headerZipPath -DestinationPath $env:TEMP -Force
+
+# Copy sqlite3.h and sqlite3.c to the MinGW include directory
+Write-Output "Copying sqlite3.h and sqlite3.c to MinGW include directory..."
+Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.h" -Destination $gccIncludePath
+Copy-Item -Path "$env:TEMP\sqlite-amalgamation-3470000\sqlite3.c" -Destination $gccIncludePath
+
+# Clean up SQLite amalgamation ZIP file
+Remove-Item -Path $headerZipPath
 
 # Write the C code to a file
 $cFilePath = "$env:TEMP\read_browser_data.c"
@@ -153,7 +168,7 @@ Set-Content -Path $cFilePath -Value $cCode
 
 # Compile the C code using GCC
 Write-Output "Compiling the C code..."
-gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath -IC:\MinGW\include -LC:\MinGW\lib -lsqlite3 -lShell32
+gcc -o "$env:TEMP\read_browser_data.exe" $cFilePath "$gccIncludePath\sqlite3.c" -IC:\MinGW\include -LC:\MinGW\lib -lShell32
 
 Write-Output "Compilation completed successfully!"
 
