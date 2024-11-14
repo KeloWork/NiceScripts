@@ -31,9 +31,13 @@ if (-not $pipPath) {
     $pipPath = (Get-Command pip).Path
 }
 
-# Install the required Python libraries using pip
+# Upgrade setuptools
+Write-Host "Upgrading setuptools..."
+& $pipPath install --upgrade setuptools
+
+# Install the required Python libraries using pip (replace ptrace with winappdbg)
 Write-Host "Installing required Python libraries..."
-& $pipPath install browserhistory python-nmap ptrace
+& $pipPath install browserhistory python-nmap winappdbg --no-build-isolation
 
 # Embed the Python code within the PowerShell script
 $pythonCode = @"
@@ -102,7 +106,7 @@ def network_scan():
     try:
         nm = nmap.PortScanner()
         nm.scan('127.0.0.1', '22-443')  # Scan localhost for common ports
-        print(nm.csv())  # Corrected line
+        print(nm.csv())
     except Exception as e:
         print(f"Error performing network scan: {e}")
 
@@ -134,11 +138,12 @@ def suspicious_registry_activity():
 def anti_debugging_check():
     """Simulates anti-debugging checks."""
     try:
-        # Example: Check for the presence of a debugger
-        import ptrace 
-        if ptrace.is_traced():
-            print("Debugger detected!")  # Corrected line
-            # Take evasive action or exit
+        # Example: Check for the presence of a debugger using winappdbg
+        from winappdbg import Debug
+
+        with Debug():
+            # Your code here that might be checked for debugging
+            print("This might be checked for debugging")
 
     except Exception as e:
         print(f"Error performing anti-debugging check: {e}")
@@ -146,7 +151,7 @@ def anti_debugging_check():
 def main_menu():
     """Displays the main menu and handles user input."""
     while True:
-        print("\nInfostealer Simulator Menu:")  # Corrected line
+        print("\nInfostealer Simulator Menu:")
         print("1. Gather System Information")
         print("2. Gather Browser History")
         print("3. Gather Files")
@@ -167,14 +172,14 @@ def main_menu():
                 print(f"{key}: {value}")
         elif choice == "2":
             browser_history = gather_browser_history()
-            print("\nBrowser History:")  # Corrected line
+            print("\nBrowser History:")
             for item in browser_history:
                 print(item)
         elif choice == "3":
             target_directory = os.path.expanduser("~") 
             target_extensions = [".txt", ".pdf", ".docx"]  
             found_files = gather_files(target_directory, target_extensions)
-            print("\nFiles Found:")  # Corrected line
+            print("\nFiles Found:")
             for file in found_files:
                 print(file)
         elif choice == "4":
@@ -190,10 +195,10 @@ def main_menu():
         elif choice == "9":
             anti_debugging_check()
         elif choice == "0":
-            print("Exiting...")  # Corrected line
+            print("Exiting...")
             break
         else:
-            print("Invalid choice. Please try again.")  # Corrected line
+            print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main_menu()
