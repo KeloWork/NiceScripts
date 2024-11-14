@@ -102,7 +102,7 @@ def network_scan():
     try:
         nm = nmap.PortScanner()
         nm.scan('127.0.0.1', '22-443')  # Scan localhost for common ports
-        print(nm.csv())
+        print(nm.csv())  # Corrected line
     except Exception as e:
         print(f"Error performing network scan: {e}")
 
@@ -137,7 +137,7 @@ def anti_debugging_check():
         # Example: Check for the presence of a debugger
         import ptrace 
         if ptrace.is_traced():
-            print("Debugger detected!")
+            print("Debugger detected!")  # Corrected line
             # Take evasive action or exit
 
     except Exception as e:
@@ -146,7 +146,7 @@ def anti_debugging_check():
 def main_menu():
     """Displays the main menu and handles user input."""
     while True:
-        print("\nInfostealer Simulator Menu:")
+        print("\nInfostealer Simulator Menu:")  # Corrected line
         print("1. Gather System Information")
         print("2. Gather Browser History")
         print("3. Gather Files")
@@ -167,14 +167,14 @@ def main_menu():
                 print(f"{key}: {value}")
         elif choice == "2":
             browser_history = gather_browser_history()
-            print("\nBrowser History:")
+            print("\nBrowser History:")  # Corrected line
             for item in browser_history:
                 print(item)
         elif choice == "3":
             target_directory = os.path.expanduser("~") 
             target_extensions = [".txt", ".pdf", ".docx"]  
             found_files = gather_files(target_directory, target_extensions)
-            print("\nFiles Found:")
+            print("\nFiles Found:")  # Corrected line
             for file in found_files:
                 print(file)
         elif choice == "4":
@@ -190,10 +190,10 @@ def main_menu():
         elif choice == "9":
             anti_debugging_check()
         elif choice == "0":
-            print("Exiting...")
+            print("Exiting...")  # Corrected line
             break
         else:
-            print("Invalid choice. Please try again.")
+            print("Invalid choice. Please try again.")  # Corrected line
 
 if __name__ == "__main__":
     main_menu()
